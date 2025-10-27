@@ -1,0 +1,199 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String    @unique
+  password  String
+  role      Role
+  createdAt DateTime  @default(now())
+
+  // Relasi ke entitas lain
+  resident  Resident?
+  musyrif   Musyrif?
+  asisten   AsistenMusyrif?
+}
+
+model Resident {
+  id         Int       @id @default(autoincrement())
+  userId     Int       @unique
+  usrohId    Int?
+  lantaiId   Int?
+  nim        String
+  jurusan    String
+  angkatan   Int
+  noTelp     String?
+  createdAt  DateTime  @default(now())
+
+  // Relasi
+  user       User      @relation(fields: [userId], references: [id])
+  usroh      Usroh?    @relation(fields: [usrohId], references: [id])
+  lantai     Lantai?   @relation(fields: [lantaiId], references: [id])
+
+  nilai      Nilai[]
+  nilaiTahfidz NilaiTahfidz[]
+  jawaban    Jawaban[]
+}
+
+
+model Musyrif {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @unique
+  lantaiId  Int?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id])
+  lantai    Lantai?   @relation(fields: [lantaiId], references: [id])
+}
+
+model AsistenMusyrif {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @unique
+  usrohId   Int?
+  nim       String
+  jurusan   String
+  angkatan  Int
+  noTelp    String?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id])
+  usroh     Usroh?    @relation(fields: [usrohId], references: [id])
+}
+
+
+model Gedung {
+  id       Int       @id @default(autoincrement())
+  nama     String
+  lantai   Lantai[]
+  createdAt DateTime @default(now())
+}
+
+model Lantai {
+  id        Int       @id @default(autoincrement())
+  nama      String
+  gedungId  Int
+  createdAt DateTime  @default(now())
+
+  gedung    Gedung    @relation(fields: [gedungId], references: [id])
+  residents Resident[]
+  musyrif   Musyrif[]
+  usroh     Usroh[]
+}
+
+model Usroh {
+  id        Int       @id @default(autoincrement())
+  nama      String
+  lantaiId  Int?
+  createdAt DateTime  @default(now())
+
+  lantai    Lantai?   @relation(fields: [lantaiId], references: [id])
+  asisten   AsistenMusyrif[]
+  residents Resident[]
+}
+
+model Materi {
+  id          Int       @id @default(autoincrement())
+  judul       String
+  deskripsi   String?
+  fileUrl     String?
+  kategoriId  Int
+  createdAt   DateTime  @default(now())
+
+  kategori    KategoriMateri @relation(fields: [kategoriId], references: [id])
+}
+
+
+model Assignment {
+  id          Int       @id @default(autoincrement())
+  judul       String
+  pertanyaan  String
+  opsiA       String
+  opsiB       String
+  opsiC       String
+  opsiD       String
+  jawabanBenar String
+  createdAt   DateTime  @default(now())
+
+  jawaban     Jawaban[]
+}
+
+model Jawaban {
+  id            Int       @id @default(autoincrement())
+  residentId    Int
+  assignmentId  Int
+  jawabanUser   String
+  isCorrect     Boolean
+  createdAt     DateTime  @default(now())
+
+  resident      Resident   @relation(fields: [residentId], references: [id])
+  assignment    Assignment @relation(fields: [assignmentId], references: [id])
+}
+
+model Nilai {
+  id          Int       @id @default(autoincrement())
+  residentId  Int
+  totalBenar  Int
+  totalSalah  Int
+  nilaiAkhir  Float
+  createdAt   DateTime  @default(now())
+
+  resident    Resident  @relation(fields: [residentId], references: [id])
+}
+
+model KategoriMateri {
+  id        Int       @id @default(autoincrement())
+  nama      String    @unique
+  createdAt DateTime  @default(now())
+
+  materi    Materi[]  // Relasi ke tabel Materi
+}
+
+
+model TargetHafalan {
+  id         Int      @id @default(autoincrement())
+  nama       String   // misalnya "Target 1"
+  surah      String   // "An-Naba’"
+  ayatMulai  Int
+  ayatAkhir  Int
+  createdAt  DateTime @default(now())
+
+  subTargets  SubTargets[]
+  nilaiTahfidz NilaiTahfidz[]
+}
+
+model SubTargets {
+  id             Int      @id @default(autoincrement())
+  nama           String   // contoh: "Sub Target 1"
+  targetId       Int
+  createdAt      DateTime @default(now())
+
+  targetHafalan         TargetHafalan @relation(fields: [targetId], references: [id])
+}
+
+model NilaiTahfidz {
+  id              Int             @id @default(autoincrement())
+  residentId      Int
+  targetHafalanId Int
+  status          String
+  nilaiHuruf      String?
+  createdAt       DateTime        @default(now())
+
+  resident        Resident        @relation(fields: [residentId], references: [id])
+  targetHafalan   TargetHafalan   @relation(fields: [targetHafalanId], references: [id])
+}
+
+
+
+enum Role {
+  ADMIN
+  MUSYRIF
+  ASISTEN
+  RESIDENT
+}
