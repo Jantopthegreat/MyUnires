@@ -28,38 +28,24 @@ export default function AddAssignmentModal({
   open,
   onClose,
   onSaved,
+  kategoriList,
+  materiList,
 }: {
   open: boolean;
   onClose: () => void;
   onSaved?: () => void;
+  kategoriList: { id: number; nama: string }[];
+  materiList: { id: number; judul: string; kategoriId: number }[];
 }) {
-  const [assignmentOpts, setAssignmentOpts] = useState<Option[]>([]);
-  const [materiOpts, setMateriOpts] = useState<Option[]>([]);
-  const [loadingDD, setLoadingDD] = useState(false);
-
   const [assignmentId, setAssignmentId] = useState("");
   const [materiId, setMateriId] = useState("");
   const [questions, setQuestions] = useState<string[]>(["", "", ""]);
-
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Dropdown loading not needed, always ready
+  const loadingDD = false;
 
-  // Load dropdown saat modal dibuka
-  useEffect(() => {
-    if (!open) return;
-    setLoadingDD(true);
-    setError(null);
-
-    Promise.all([
-      apiGet<Option[]>(LIST_ASSIGNMENT_OPTIONS).catch(() => ASSIGNMENT_OPTS_FALLBACK),
-      apiGet<Option[]>(LIST_MATERI_OPTIONS).catch(() => MATERI_OPTS_FALLBACK),
-    ])
-      .then(([a, m]) => {
-        setAssignmentOpts(Array.isArray(a) ? a : ASSIGNMENT_OPTS_FALLBACK);
-        setMateriOpts(Array.isArray(m) ? m : MATERI_OPTS_FALLBACK);
-      })
-      .finally(() => setLoadingDD(false));
-  }, [open]);
+  // Remove dropdown fetch logic, use props instead
 
   const canSave = useMemo(() => {
     const hasQuestion = questions.some((q) => q.trim() !== "");
@@ -109,7 +95,13 @@ export default function AddAssignmentModal({
             className="absolute right-4 top-4 rounded-full p-1 text-slate-500 hover:bg-slate-100"
             aria-label="Tutup"
           >
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-6 w-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M6 6l12 12M18 6l-12 12" />
             </svg>
           </button>
@@ -120,18 +112,17 @@ export default function AddAssignmentModal({
           {/* Assignment */}
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">
-              Assignment <span className="text-red-600">*</span>
+              Kategori Materi <span className="text-red-600">*</span>
             </label>
             <select
               value={assignmentId}
               onChange={(e) => setAssignmentId(e.target.value)}
-              disabled={loadingDD}
               className="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
             >
-              <option value="">{loadingDD ? "Memuat..." : "Masukkan Assignment"}</option>
-              {assignmentOpts.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.name}
+              <option value="">Pilih Kategori</option>
+              {kategoriList.map((k) => (
+                <option key={k.id} value={k.id.toString()}>
+                  {k.nama}
                 </option>
               ))}
             </select>
@@ -145,15 +136,20 @@ export default function AddAssignmentModal({
             <select
               value={materiId}
               onChange={(e) => setMateriId(e.target.value)}
-              disabled={loadingDD}
               className="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
             >
-              <option value="">{loadingDD ? "Memuat..." : "Masukkan Materi"}</option>
-              {materiOpts.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.name}
-                </option>
-              ))}
+              <option value="">Pilih Materi</option>
+              {materiList
+                .filter(
+                  (m) =>
+                    assignmentId === "" ||
+                    m.kategoriId.toString() === assignmentId
+                )
+                .map((m) => (
+                  <option key={m.id} value={m.id.toString()}>
+                    {m.judul}
+                  </option>
+                ))}
             </select>
           </div>
 
