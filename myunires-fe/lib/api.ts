@@ -50,6 +50,59 @@ export async function apiPost<T>(
   return (await res.json()) as T;
 }
 
+/**
+ * Helper untuk request method PUT (Update data).
+ */
+export async function apiPut<T>(
+  path: string,
+  body: unknown,
+  init?: RequestInit
+) {
+  const url = `${API_BASE}${path}`;
+  const token = getToken();
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers || {})
+    },
+    body: JSON.stringify(body),
+    cache: "no-store",
+    ...init,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`PUT ${url} -> ${res.status} ${res.statusText} ${text}`);
+  }
+  return (await res.json()) as T;
+}
+
+/**
+ * Helper untuk request method DELETE (Hapus data).
+ */
+export async function apiDelete<T>(path: string, init?: RequestInit) {
+  const url = `${API_BASE}${path}`;
+  const token = getToken();
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    cache: "no-store",
+    ...init,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`DELETE ${url} -> ${res.status} ${res.statusText} ${text}`);
+  }
+  // Coba parse JSON, tapi jika gagal (misalnya 204 No Content), kembalikan objek kosong
+  try {
+    return (await res.json()) as T;
+  } catch (e) {
+    return {} as T;
+  }
+}
 // ============ Auth Helpers ============
 
 export interface LoginResponse {
@@ -99,7 +152,7 @@ export function clearAuth() {
 export function getRedirectPath(role: string): string {
   switch (role) {
     case "ADMIN":
-      return "/pembina/dashboard";
+      return "/admin/dashboard";
     case "MUSYRIF":
       return "/pembina/dashboard";
     case "ASISTEN":

@@ -21,7 +21,7 @@ app.use("/api/resident", residentRoutes);
 app.use("/api/asisten", asistenMusyrifRoutes);
 app.use("/api/musyrif", musyrifRoutes);
 
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });

@@ -91,7 +91,7 @@ export const createResident = async (req, res) => {
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) return res.status(400).json({ message: "Email sudah terdaftar." });
-    const existingNIM = await prisma.resident.findUnique({ where: { nim } });
+    const existingNIM = await prisma.resident.findFirst({ where: { nim } });
     if (existingNIM) {
       return res.status(400).json({ message: "NIM sudah terdaftar." });
     }
@@ -139,55 +139,102 @@ export const createResident = async (req, res) => {
  * Update data Resident
  */
 export const updateResident = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, email, password, nim, jurusan, angkatan, noTelp, usrohId, lantaiId } = req.body;
-    const existingNIM = await prisma.resident.findUnique({ where: { nim } });
-    if (existingNIM) {
-     return res.status(400).json({ message: "NIM sudah terdaftar." });
-    }
+  try {
+    const { id } = req.params;
+    // Pastikan id diubah menjadi Number
+    const residentId = Number(id); 
 
+    const { name, email, password, nim, jurusan, angkatan, noTelp, usrohId, lantaiId } = req.body;
+    
+    // --- 1. Pengecekan Duplikasi NIM (Mengabaikan Resident yang sedang di-edit) ---
+    const existingNIM = await prisma.resident.findFirst({ 
+      where: { 
+        nim,
+        // Kunci Solusi: Hanya cari NIM yang sama TAPI ID-nya berbeda dari ID yang sedang di-update
+        id: {
+          not: residentId,
+        }
+      } 
+    });
+    
+    if (existingNIM) {
+     return res.status(400).json({ message: "NIM sudah terdaftar pada resident lain." });
+    }
 
-    const resident = await prisma.resident.findUnique({
-      where: { id: Number(id) },
-      include: { user: true },
+    // 2. Cari resident yang akan di-update
+    const resident = await prisma.resident.findUnique({
+      where: { id: residentId },
+      include: { user: true },
+    });
+
+    if (!resident) return res.status(404).json({ message: "Resident tidak ditemukan." });
+
+    // --- 3. Pengecekan Duplikasi Email (Mengabaikan User yang sedang di-edit) ---
+    const existingUser = await prisma.user.findFirst({
+        where: {
+            email,
+            // Kecualikan user dari resident yang sedang di-update
+            id: { not: resident.user.id },
+        }
     });
+    
+    if (existingUser) return res.status(400).json({ message: "Email sudah terdaftar pada resident/user lain." });
 
-    if (!resident) return res.status(404).json({ message: "Resident tidak ditemukan." });
 
-    let hashedPassword = resident.user.password;
-    if (password) hashedPassword = await bcrypt.hash(password, 10);
+    // 4. Proses password (Hanya hash jika ada password baru dikirim)
+    let hashedPassword = resident.user.password;
+    if (password) hashedPassword = await bcrypt.hash(password, 10);
+    
+    // --- 5. Validasi Minimal Update Fields (Opsional, tapi disarankan) ---
+    // Di mode Edit, Anda mungkin tidak ingin mewajibkan semua field.
+    // Namun, jika Anda ingin mewajibkan Name, Email, NIM, Jurusan, Angkatan, tambahkan validasi di sini:
+    // if (!name || !email || !nim || !jurusan || !angkatan) { ... }
 
-    const updated = await prisma.$transaction(async (tx) => {
-      const updatedUser = await tx.user.update({
-        where: { id: resident.user.id },
-        data: { name, email, password: hashedPassword },
-      });
+    
+    // 6. Jalankan transaksi update
+    const updated = await prisma.$transaction(async (tx) => {
+      
+      // Data untuk User
+      const userDataUpdate = {};
+      if (name !== undefined) userDataUpdate.name = name;
+      if (email !== undefined) userDataUpdate.email = email;
+      // Hanya update password jika field 'password' di body request ada isinya (non-empty string)
+      if (password) userDataUpdate.password = hashedPassword; 
 
-      const updatedResident = await tx.resident.update({
-        where: { id: Number(id) },
-        data: {
-          nim,
-          jurusan,
-          angkatan: Number(angkatan),
-          noTelp,
-          usrohId,
-          lantaiId,
-        },
-      });
+      const updatedUser = await tx.user.update({
+        where: { id: resident.user.id },
+        data: userDataUpdate,
+      });
 
-      return { updatedUser, updatedResident };
-    });
+      // Data untuk Resident
+      // Kita perlu memastikan bahwa jika frontend mengirimkan string kosong ('') untuk field opsional (seperti noTelp), 
+      // kita mengubahnya menjadi null sebelum masuk ke database, sesuai dengan skema Prisma.
+      const residentDataUpdate = {
+          nim,
+          jurusan,
+          angkatan: Number(angkatan),
+          noTelp: noTelp === '' ? null : noTelp,
+          usrohId: usrohId === '' ? null : usrohId, // Pastikan usrohId bertipe Number/null
+          lantaiId: lantaiId === '' ? null : lantaiId, // Pastikan lantaiId bertipe Number/null
+      };
+      
+      const updatedResident = await tx.resident.update({
+        where: { id: residentId },
+        data: residentDataUpdate,
+      });
 
-    res.status(200).json({
-      success: true,
-      message: "Data resident berhasil diperbarui.",
-      data: updated,
-    });
-  } catch (error) {
-    console.error("❌ Error updateResident:", error);
-    res.status(500).json({ message: "Terjadi kesalahan server." });
-  }
+      return { updatedUser, updatedResident };
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Data resident berhasil diperbarui.",
+      data: updated,
+    });
+  } catch (error) {
+    console.error("❌ Error updateResident:", error);
+    res.status(500).json({ message: "Terjadi kesalahan server." });
+  }
 };
 
 /**
