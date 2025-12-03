@@ -33,7 +33,9 @@ const AssignmentAddEditModal: React.FC<AssignmentAddEditModalProps> = ({
           {mode === "add" ? "Tambah Assignment" : "Edit Assignment"}
         </h2>
         <div className="mb-3">
-          <label className="block text-sm mb-1 font-semibold text-[#004220]">Kategori Materi</label>
+          <label className="block text-sm mb-1 font-semibold text-[#004220]">
+            Kategori Materi
+          </label>
           <select
             value={selectedKategoriForm}
             onChange={(e) => setSelectedKategoriForm(e.target.value)}
@@ -48,7 +50,9 @@ const AssignmentAddEditModal: React.FC<AssignmentAddEditModalProps> = ({
           </select>
         </div>
         <div className="mb-3">
-          <label className="block text-sm mb-1 font-semibold text-[#004220]">Materi</label>
+          <label className="block text-sm mb-1 font-semibold text-[#004220]">
+            Materi
+          </label>
           <select
             value={formData.materiId}
             onChange={(e) =>
@@ -67,7 +71,9 @@ const AssignmentAddEditModal: React.FC<AssignmentAddEditModalProps> = ({
           </select>
         </div>
         <div className="mb-3">
-          <label className="block text-sm mb-1 font-semibold text-[#004220]">Judul Assignment</label>
+          <label className="block text-sm mb-1 font-semibold text-[#004220]">
+            Judul Assignment
+          </label>
           <input
             type="text"
             value={formData.judul}
@@ -78,7 +84,9 @@ const AssignmentAddEditModal: React.FC<AssignmentAddEditModalProps> = ({
           />
         </div>
         <div className="mb-3">
-          <label className="block text-sm mb-1 font-semibold text-[#004220]">Pertanyaan</label>
+          <label className="block text-sm mb-1 font-semibold text-[#004220]">
+            Pertanyaan
+          </label>
           <input
             type="text"
             value={formData.pertanyaan}
@@ -90,7 +98,9 @@ const AssignmentAddEditModal: React.FC<AssignmentAddEditModalProps> = ({
         </div>
         <div className="mb-3 grid grid-cols-2 gap-2">
           <div>
-            <label className="block text-sm mb-1 font-semibold text-[#004220]">Opsi A</label>
+            <label className="block text-sm mb-1 font-semibold text-[#004220]">
+              Opsi A
+            </label>
             <input
               type="text"
               value={formData.opsiA}
@@ -101,7 +111,9 @@ const AssignmentAddEditModal: React.FC<AssignmentAddEditModalProps> = ({
             />
           </div>
           <div>
-            <label className="block text-sm mb-1 font-semibold text-[#004220]">Opsi B</label>
+            <label className="block text-sm mb-1 font-semibold text-[#004220]">
+              Opsi B
+            </label>
             <input
               type="text"
               value={formData.opsiB}
@@ -112,7 +124,9 @@ const AssignmentAddEditModal: React.FC<AssignmentAddEditModalProps> = ({
             />
           </div>
           <div>
-            <label className="block text-sm mb-1 font-semibold text-[#004220]">Opsi C</label>
+            <label className="block text-sm mb-1 font-semibold text-[#004220]">
+              Opsi C
+            </label>
             <input
               type="text"
               value={formData.opsiC}
@@ -123,7 +137,9 @@ const AssignmentAddEditModal: React.FC<AssignmentAddEditModalProps> = ({
             />
           </div>
           <div>
-            <label className="block text-sm mb-1 font-semibold text-[#004220]">Opsi D</label>
+            <label className="block text-sm mb-1 font-semibold text-[#004220]">
+              Opsi D
+            </label>
             <input
               type="text"
               value={formData.opsiD}
@@ -135,7 +151,9 @@ const AssignmentAddEditModal: React.FC<AssignmentAddEditModalProps> = ({
           </div>
         </div>
         <div className="mb-3">
-          <label className="block text-sm mb-1 font-semibold text-[#004220]">Jawaban Benar</label>
+          <label className="block text-sm mb-1 font-semibold text-[#004220]">
+            Jawaban Benar
+          </label>
           <select
             value={formData.jawabanBenar}
             onChange={(e) =>
