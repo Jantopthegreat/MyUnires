@@ -10,8 +10,6 @@ import LogoutModal from "@/components/LogoutModal";
 import Swal from "sweetalert2";
 import { clearAuth } from "@/lib/api";
 
-
-
 interface Resident {
   id: number;
   nama: string;
@@ -359,10 +357,16 @@ export default function TahfidzPage() {
         }}
       />
       <Sidebar isOpen={isOpen} toggleSidebar={toggleSidebar} />
-      <main className={`flex-1 flex flex-col transition-all duration-300 ${isOpen ? "ml-64" : "ml-12"}`}>
+      <main
+        className={`flex-1 flex flex-col transition-all duration-300 ${
+          isOpen ? "ml-64" : "ml-12"
+        }`}
+      >
         <div className="h-16" />
         <header className="px-6 py-4">
-          <h1 className="bg-[#004220] text-white text-center py-6 rounded-md text-lg font-semibold">Nilai Tahfidz</h1>
+          <h1 className="bg-[#004220] text-white text-center py-6 rounded-md text-lg font-semibold">
+            Nilai Tahfidz
+          </h1>
         </header>
         <TahfidzFilterBar
           searchTerm={searchTerm}
