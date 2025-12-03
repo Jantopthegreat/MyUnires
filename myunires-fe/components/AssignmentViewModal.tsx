@@ -50,11 +50,15 @@ const AssignmentViewModal: React.FC<AssignmentViewModalProps> = ({
           </div>
           <div>
             <span className="font-semibold text-[#004220]">Materi:</span>
-            <span className="ml-2 text-gray-800">{assignment.materi?.judul || "-"}</span>
+            <span className="ml-2 text-gray-800">
+              {assignment.materi?.judul || "-"}
+            </span>
           </div>
           <div>
             <span className="font-semibold text-[#004220]">Kategori:</span>
-            <span className="ml-2 text-gray-800">{assignment.materi?.kategori?.nama || "-"}</span>
+            <span className="ml-2 text-gray-800">
+              {assignment.materi?.kategori?.nama || "-"}
+            </span>
           </div>
           <div>
             <span className="font-semibold text-[#004220]">Opsi A:</span>
@@ -74,7 +78,9 @@ const AssignmentViewModal: React.FC<AssignmentViewModalProps> = ({
           </div>
           <div>
             <span className="font-semibold text-[#004220]">Jawaban Benar:</span>
-            <span className="ml-2 text-gray-800">{assignment.jawabanBenar}</span>
+            <span className="ml-2 text-gray-800">
+              {assignment.jawabanBenar}
+            </span>
           </div>
         </div>
         <div className="flex justify-end mt-8">
