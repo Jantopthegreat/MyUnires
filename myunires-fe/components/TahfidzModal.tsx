@@ -24,7 +24,6 @@ interface TahfidzModalProps {
   targetHafalan: TargetHafalan[];
 }
 
-
 import { useState, useEffect } from "react";
 
 const TahfidzModal: React.FC<TahfidzModalProps> = ({
@@ -64,7 +63,9 @@ const TahfidzModal: React.FC<TahfidzModalProps> = ({
     }
   }, [isOpen, mode, data]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
@@ -105,7 +106,9 @@ const TahfidzModal: React.FC<TahfidzModalProps> = ({
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Target Hafalan</label>
+            <label className="block text-sm font-medium mb-1">
+              Target Hafalan
+            </label>
             <select
               name="targetHafalanId"
               value={form.targetHafalanId}
@@ -133,7 +136,9 @@ const TahfidzModal: React.FC<TahfidzModalProps> = ({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Nilai Huruf</label>
+            <label className="block text-sm font-medium mb-1">
+              Nilai Huruf
+            </label>
             <select
               name="nilaiHuruf"
               value={form.nilaiHuruf}
@@ -155,7 +160,9 @@ const TahfidzModal: React.FC<TahfidzModalProps> = ({
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Tanggal Penilaian</label>
+            <label className="block text-sm font-medium mb-1">
+              Tanggal Penilaian
+            </label>
             <input
               type="date"
               name="tanggal"
