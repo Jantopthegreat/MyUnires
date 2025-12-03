@@ -1,55 +1,85 @@
 "use client";
-import React from "react";
-import { Resident } from "@/types/resident";
+
+interface Resident {
+  id: number;
+  userId: number;
+  name: string;
+  email: string;
+  nim: string;
+  noUnires: string;
+  jurusan: string;
+  angkatan: number;
+  usroh: string;
+  usrohId: number | null;
+  asrama: string;
+  lantaiId: number | null;
+  noTelp: string;
+}
+
+interface ResidentTableProps {
+  residents: Resident[];
+  loading: boolean;
+  onViewDetail: (resident: Resident) => void;
+}
 
 export default function ResidentTable({
-  rows,
+  residents,
   loading,
-  onView,
-}: {
-  rows: Resident[];
-  loading?: boolean;
-  onView?: (r: Resident) => void;
-}) {
+  onViewDetail,
+}: ResidentTableProps) {
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow overflow-hidden border border-[#004220]">
+        <div className="text-center py-10 text-gray-500">Memuat data...</div>
+      </div>
+    );
+  }
+
+  if (residents.length === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow overflow-hidden border border-[#004220]">
+        <div className="text-center py-10 text-gray-500">
+          Tidak ada data resident
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="overflow-hidden rounded-2xl border border-emerald-900/30 shadow-sm">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-emerald-50 text-emerald-900">
-            <th className="w-16 px-4 py-3 text-left font-semibold">No</th>
-            <th className="px-4 py-3 text-left font-semibold">Nama</th>
-            <th className="px-4 py-3 text-left font-semibold">Nama Usroh</th>
-            <th className="w-40 px-4 py-3 text-left font-semibold">No Unires</th>
-            <th className="w-24 px-4 py-3 text-left font-semibold">Aksi</th>
+    <div className="bg-white rounded-lg shadow overflow-hidden border border-[#004220]">
+      <table className="w-full text-sm border-collapse">
+        <thead className="text-[#004220] border-b border-[#004220]">
+          <tr>
+            <th className="py-3 text-left px-4">No</th>
+            <th className="py-3 text-left px-4">Nama</th>
+            <th className="py-3 text-left px-4">No Unires</th>
+            <th className="py-3 text-left px-4">Nama Usroh</th>
+            <th className="py-3 text-left px-4">Asrama</th>
+            <th className="py-3 text-center px-4">Aksi</th>
           </tr>
         </thead>
         <tbody>
-          {loading ? (
-            <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">Memuat data…</td></tr>
-          ) : rows.length === 0 ? (
-            <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">Tidak ada data.</td></tr>
-          ) : (
-            rows.map((r, i) => (
-              <tr key={r.id} className="border-t border-slate-200/70 hover:bg-emerald-50/40">
-                <td className="px-4 py-3">{i + 1}</td>
-                <td className="px-4 py-3">{r.name}</td>
-                <td className="px-4 py-3">{r.usrohName}</td>
-                <td className="px-4 py-3">{r.uniresNumber}</td>
-                <td className="px-2 py-3">
-                  <button
-                    onClick={() => onView?.(r)}
-                    title="Lihat detail"
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-emerald-900 hover:bg-emerald-900/5"
-                  >
-                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                  </button>
-                </td>
-              </tr>
-            ))
-          )}
+          {residents.map((r, i) => (
+            <tr
+              key={r.id}
+              className="text-[#004220] border-b border-[#004220] hover:bg-[#F7F9F8] transition"
+            >
+              <td className="py-3 px-4">{i + 1}</td>
+              <td className="py-3 px-4">{r.name}</td>
+              <td className="py-3 px-4">{r.nim}</td>
+              <td className="py-3 px-4">{r.usroh}</td>
+              <td className="py-3 px-4">{r.asrama}</td>
+              <td className="py-3 px-4 text-center">
+                <button onClick={() => onViewDetail(r)}>
+                  <img
+                    src="/eye_icon.svg"
+                    alt="view"
+                    className="h-5 mx-auto cursor-pointer hover:opacity-70 transition"
+                  />
+                </button>
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
