@@ -107,11 +107,13 @@ model Materi {
   createdAt   DateTime  @default(now())
 
   kategori    KategoriMateri @relation(fields: [kategoriId], references: [id])
+  assignments Assignment[]  // Relasi: Materi punya banyak Assignment (soal)
 }
 
 
 model Assignment {
   id          Int       @id @default(autoincrement())
+  materiId    Int       // Foreign key ke Materi
   judul       String
   pertanyaan  String
   opsiA       String
@@ -121,6 +123,7 @@ model Assignment {
   jawabanBenar String
   createdAt   DateTime  @default(now())
 
+  materi      Materi    @relation(fields: [materiId], references: [id], onDelete: Cascade)
   jawaban     Jawaban[]
 }
 

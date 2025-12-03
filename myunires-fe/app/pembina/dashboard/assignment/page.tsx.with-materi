@@ -1,0 +1,671 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import Sidebar from "@/components/Sidebar";
+import Swal from "sweetalert2";
+
+// Types
+interface KategoriMateri {
+  id: number;
+  nama: string;
+}
+
+interface Materi {
+  id: number;
+  judul: string;
+  kategoriId: number;
+  kategori?: KategoriMateri;
+}
+
+interface Assignment {
+  id: number;
+  judul: string;
+  pertanyaan: string;
+  opsiA: string;
+  opsiB: string;
+  opsiC: string;
+  opsiD: string;
+  jawabanBenar: string;
+  kategoriId: number;
+  kategori?: KategoriMateri;
+}
+
+interface FormData {
+  judul: string;
+  pertanyaan: string;
+  opsiA: string;
+  opsiB: string;
+  opsiC: string;
+  opsiD: string;
+  jawabanBenar: string;
+  kategoriId: number;
+}
+
+export default function AssignmentPage() {
+  // States
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [filteredAssignments, setFilteredAssignments] = useState<Assignment[]>([]);
+  const [kategoriList, setKategoriList] = useState<KategoriMateri[]>([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  
+  // Filter states
+  const [filterKategori, setFilterKategori] = useState<number>(0);
+  
+  // Modal states
+  const [showModal, setShowModal] = useState(false);
+  const [modalMode, setModalMode] = useState<"add" | "edit" | "view">("add");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  
+  // Form states
+  const [selectedKategori, setSelectedKategori] = useState<number>(0);
+  const [formData, setFormData] = useState<FormData>({
+    judul: "",
+    pertanyaan: "",
+    opsiA: "",
+    opsiB: "",
+    opsiC: "",
+    opsiD: "",
+    jawabanBenar: "A",
+    kategoriId: 0,
+  });
+
+  // Fetch data on component mount
+  useEffect(() => {
+    fetchKategori();
+    fetchAssignments();
+  }, []);
+
+  // Fetch kategori list
+  const fetchKategori = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:3001/api/musyrif/kategori", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("Kategori response:", result); // Debug log
+        
+        // Backend returns: { success: true, data: [...] }
+        if (result.data && Array.isArray(result.data)) {
+          setKategoriList(result.data);
+        } else if (Array.isArray(result)) {
+          setKategoriList(result);
+        } else {
+          setKategoriList([]);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching kategori:", error);
+      setKategoriList([]); // Set empty array on error
+    }
+  };
+
+  // Fetch all assignments
+  const fetchAssignments = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:3001/api/musyrif/assignments", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("Assignments response:", result); // Debug log
+        
+        // Backend returns: { success: true, data: [...] }
+        if (result.data && Array.isArray(result.data)) {
+          setAssignments(result.data);
+          setFilteredAssignments(result.data);
+        } else if (Array.isArray(result)) {
+          setAssignments(result);
+          setFilteredAssignments(result);
+        } else {
+          setAssignments([]);
+          setFilteredAssignments([]);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching assignments:", error);
+      Swal.fire("Error", "Gagal memuat data assignment", "error");
+      setAssignments([]);
+      setFilteredAssignments([]);
+    }
+  };
+
+  // Filter assignments based on kategori
+  useEffect(() => {
+    let filtered = assignments;
+
+    if (filterKategori > 0) {
+      filtered = filtered.filter(
+        (a) => a.kategoriId === filterKategori
+      );
+    }
+
+    setFilteredAssignments(filtered);
+  }, [filterKategori, assignments]);
+
+  // Update materi list when kategori changes in modal
+  useEffect(() => {
+    if (selectedKategori > 0) {
+      fetchMateri(selectedKategori);
+    } else {
+      setMateriList([]);
+    }
+  }, [selectedKategori]);
+
+  // Handle modal open
+  const handleAdd = () => {
+    resetForm();
+    setModalMode("add");
+    setShowModal(true);
+  };
+
+  const handleView = (assignment: Assignment) => {
+    setFormData({
+      judul: assignment.judul,
+      pertanyaan: assignment.pertanyaan,
+      opsiA: assignment.opsiA,
+      opsiB: assignment.opsiB,
+      opsiC: assignment.opsiC,
+      opsiD: assignment.opsiD,
+      jawabanBenar: assignment.jawabanBenar,
+      materiId: assignment.materiId,
+    });
+    setSelectedKategori(assignment.materi?.kategoriId || 0);
+    setEditingId(assignment.id);
+    setModalMode("view");
+    setShowModal(true);
+  };
+
+  const handleEdit = (assignment: Assignment) => {
+    setFormData({
+      judul: assignment.judul,
+      pertanyaan: assignment.pertanyaan,
+      opsiA: assignment.opsiA,
+      opsiB: assignment.opsiB,
+      opsiC: assignment.opsiC,
+      opsiD: assignment.opsiD,
+      jawabanBenar: assignment.jawabanBenar,
+      materiId: assignment.materiId,
+    });
+    setSelectedKategori(assignment.materi?.kategoriId || 0);
+    setEditingId(assignment.id);
+    setModalMode("edit");
+    setShowModal(true);
+  };
+
+  const handleDelete = async (id: number) => {
+    const result = await Swal.fire({
+      title: "Hapus Assignment?",
+      text: "Data yang dihapus tidak dapat dikembalikan!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Ya, Hapus!",
+      cancelButtonText: "Batal",
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch(
+          `http://localhost:3001/api/musyrif/assignments/${id}`,
+          {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        if (response.ok) {
+          Swal.fire("Berhasil!", "Assignment berhasil dihapus", "success");
+          fetchAssignments();
+        } else {
+          throw new Error("Failed to delete");
+        }
+      } catch (error) {
+        console.error("Error deleting assignment:", error);
+        Swal.fire("Error", "Gagal menghapus assignment", "error");
+      }
+    }
+  };
+
+  // Handle form submit
+  const handleSubmit = async () => {
+    // Validation
+    if (!formData.judul || !formData.pertanyaan || formData.materiId === 0) {
+      Swal.fire("Error", "Semua field harus diisi!", "error");
+      return;
+    }
+
+    if (!formData.opsiA || !formData.opsiB || !formData.opsiC || !formData.opsiD) {
+      Swal.fire("Error", "Semua opsi jawaban harus diisi!", "error");
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("token");
+      const url =
+        modalMode === "add"
+          ? "http://localhost:3001/api/musyrif/assignments"
+          : `http://localhost:3001/api/musyrif/assignments/${editingId}`;
+
+      const method = modalMode === "add" ? "POST" : "PUT";
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (response.ok) {
+        Swal.fire(
+          "Berhasil!",
+          `Assignment berhasil ${modalMode === "add" ? "ditambahkan" : "diupdate"}`,
+          "success"
+        );
+        setShowModal(false);
+        resetForm();
+        fetchAssignments();
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to save");
+      }
+    } catch (error: any) {
+      console.error("Error saving assignment:", error);
+      Swal.fire("Error", error.message || "Gagal menyimpan assignment", "error");
+    }
+  };
+
+  // Reset form
+  const resetForm = () => {
+    setFormData({
+      judul: "",
+      pertanyaan: "",
+      opsiA: "",
+      opsiB: "",
+      opsiC: "",
+      opsiD: "",
+      jawabanBenar: "A",
+      materiId: 0,
+    });
+    setSelectedKategori(0);
+    setEditingId(null);
+  };
+
+  return (
+    <div className="flex h-screen bg-gray-50">
+      <Sidebar isOpen={isSidebarOpen} toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-8">
+          {/* Header */}
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-gray-800">
+              Data Assignment
+            </h1>
+            <p className="text-gray-600 text-sm mt-1">
+              Kelola assignment untuk santri
+            </p>
+          </div>
+
+          {/* Filter Section */}
+          <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Filter Kategori
+                </label>
+                <select
+                  value={filterKategori}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setFilterKategori(val);
+                    setFilterMateri(0);
+                    if (val > 0) fetchMateri(val);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B7CFC1]"
+                >
+                  <option value={0}>Semua Kategori</option>
+                  {Array.isArray(kategoriList) && kategoriList.map((k) => (
+                    <option key={k.id} value={k.id}>
+                      {k.nama}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Filter Materi
+                </label>
+                <select
+                  value={filterMateri}
+                  onChange={(e) => setFilterMateri(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B7CFC1]"
+                  disabled={filterKategori === 0}
+                >
+                  <option value={0}>Semua Materi</option>
+                  {Array.isArray(materiList) && materiList.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.judul}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  onClick={handleAdd}
+                  className="w-full px-4 py-2 bg-[#B7CFC1] text-white rounded-lg hover:bg-[#9bb8a8] transition-colors"
+                >
+                  + Tambah Assignment
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-[#B7CFC1] text-white">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-sm font-semibold">
+                      No
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold">
+                      Assignment
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold">
+                      Materi
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold">
+                      Kategori
+                    </th>
+                    <th className="px-6 py-3 text-center text-sm font-semibold">
+                      Aksi
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {filteredAssignments.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                        Tidak ada data assignment
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAssignments.map((assignment, index) => (
+                      <tr
+                        key={assignment.id}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {index + 1}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {assignment.judul}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {assignment.materi?.judul || "-"}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {assignment.materi?.kategori?.nama || "-"}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex justify-center gap-2">
+                            <button
+                              onClick={() => handleView(assignment)}
+                              className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
+                            >
+                              Lihat
+                            </button>
+                            <button
+                              onClick={() => handleEdit(assignment)}
+                              className="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600 transition-colors"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDelete(assignment.id)}
+                              className="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600 transition-colors"
+                            >
+                              Hapus
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-800">
+                {modalMode === "add"
+                  ? "Tambah Assignment"
+                  : modalMode === "edit"
+                  ? "Edit Assignment"
+                  : "Detail Assignment"}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowModal(false);
+                  resetForm();
+                }}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Kategori */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Kategori <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedKategori}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setSelectedKategori(val);
+                    setFormData({ ...formData, materiId: 0 });
+                  }}
+                  disabled={modalMode === "view"}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B7CFC1] disabled:bg-gray-100"
+                >
+                  <option value={0}>Pilih Kategori</option>
+                  {Array.isArray(kategoriList) && kategoriList.map((k) => (
+                    <option key={k.id} value={k.id}>
+                      {k.nama}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Materi */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Materi <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.materiId}
+                  onChange={(e) =>
+                    setFormData({ ...formData, materiId: Number(e.target.value) })
+                  }
+                  disabled={modalMode === "view" || selectedKategori === 0}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B7CFC1] disabled:bg-gray-100"
+                >
+                  <option value={0}>Pilih Materi</option>
+                  {Array.isArray(materiList) && materiList.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.judul}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Judul */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Judul Assignment <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.judul}
+                  onChange={(e) =>
+                    setFormData({ ...formData, judul: e.target.value })
+                  }
+                  disabled={modalMode === "view"}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B7CFC1] disabled:bg-gray-100"
+                  placeholder="Masukkan judul assignment"
+                />
+              </div>
+
+              {/* Pertanyaan */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Pertanyaan <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={formData.pertanyaan}
+                  onChange={(e) =>
+                    setFormData({ ...formData, pertanyaan: e.target.value })
+                  }
+                  disabled={modalMode === "view"}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B7CFC1] disabled:bg-gray-100"
+                  placeholder="Masukkan pertanyaan"
+                />
+              </div>
+
+              {/* Opsi A-D */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Opsi A <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.opsiA}
+                    onChange={(e) =>
+                      setFormData({ ...formData, opsiA: e.target.value })
+                    }
+                    disabled={modalMode === "view"}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B7CFC1] disabled:bg-gray-100"
+                    placeholder="Opsi A"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Opsi B <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.opsiB}
+                    onChange={(e) =>
+                      setFormData({ ...formData, opsiB: e.target.value })
+                    }
+                    disabled={modalMode === "view"}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B7CFC1] disabled:bg-gray-100"
+                    placeholder="Opsi B"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Opsi C <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.opsiC}
+                    onChange={(e) =>
+                      setFormData({ ...formData, opsiC: e.target.value })
+                    }
+                    disabled={modalMode === "view"}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B7CFC1] disabled:bg-gray-100"
+                    placeholder="Opsi C"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Opsi D <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.opsiD}
+                    onChange={(e) =>
+                      setFormData({ ...formData, opsiD: e.target.value })
+                    }
+                    disabled={modalMode === "view"}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B7CFC1] disabled:bg-gray-100"
+                    placeholder="Opsi D"
+                  />
+                </div>
+              </div>
+
+              {/* Jawaban Benar */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Jawaban Benar <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.jawabanBenar}
+                  onChange={(e) =>
+                    setFormData({ ...formData, jawabanBenar: e.target.value })
+                  }
+                  disabled={modalMode === "view"}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B7CFC1] disabled:bg-gray-100"
+                >
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                  <option value="C">C</option>
+                  <option value="D">D</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            {modalMode !== "view" && (
+              <div className="sticky bottom-0 bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t">
+                <button
+                  onClick={() => {
+                    setShowModal(false);
+                    resetForm();
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  className="px-4 py-2 bg-[#B7CFC1] text-white rounded-lg hover:bg-[#9bb8a8] transition-colors"
+                >
+                  {modalMode === "add" ? "Tambah" : "Simpan"}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

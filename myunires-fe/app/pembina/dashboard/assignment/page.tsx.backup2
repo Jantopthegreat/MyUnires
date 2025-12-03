@@ -1,0 +1,676 @@
+"use client";
+import { useState, useEffect } from "react";
+import { FaSearch, FaPlus } from "react-icons/fa";
+import Sidebar from "@/components/Sidebar";
+import Swal from "sweetalert2";
+import CustomSelect from "@/components/CustomSelect";
+
+interface AssignmentData {
+  id: number;
+  judul: string;
+  pertanyaan: string;
+  opsiA: string;
+  opsiB: string;
+  opsiC: string;
+  opsiD: string;
+  jawabanBenar: string;
+  materiId?: number;
+  materi?: {
+    id: number;
+    judul: string;
+    kategori?: {
+      id: number;
+      nama: string;
+    };
+  };
+}
+
+interface MateriOption {
+  id: number;
+  judul: string;
+  kategori?: {
+    id: number;
+    nama: string;
+  };
+}
+
+interface KategoriOption {
+  id: number;
+  nama: string;
+}
+
+export default function AssignmentPage() {
+  const [isOpen, setIsOpen] = useState(true);
+  const toggleSidebar = () => setIsOpen((prev) => !prev);
+
+  // State untuk data
+  const [assignments, setAssignments] = useState<AssignmentData[]>([]);
+  const [filteredAssignments, setFilteredAssignments] = useState<AssignmentData[]>([]);
+  const [materiOptions, setMateriOptions] = useState<MateriOption[]>([]);
+  const [kategoriOptions, setKategoriOptions] = useState<KategoriOption[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // State untuk filter
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedKategori, setSelectedKategori] = useState("all");
+  const [selectedMateri, setSelectedMateri] = useState("all");
+
+  // State untuk modal
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState<AssignmentData | null>(null);
+
+  // State untuk form add/edit
+  const [formData, setFormData] = useState({
+    judul: "",
+    pertanyaan: "",
+    opsiA: "",
+    opsiB: "",
+    opsiC: "",
+    opsiD: "",
+    jawabanBenar: "",
+    materiId: "",
+    kategoriId: "",
+  });
+
+  // Fetch assignments
+  const fetchAssignments = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:3001/api/musyrif/assignments", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setAssignments(data.data);
+        setFilteredAssignments(data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching assignments:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Gagal memuat data assignment",
+        confirmButtonColor: "#ef4444",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch kategori
+  const fetchKategori = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:3001/api/musyrif/kategori", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setKategoriOptions(data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching kategori:", error);
+    }
+  };
+
+  // Fetch materi
+  const fetchMateri = async (kategoriId?: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      const url = kategoriId && kategoriId !== "all"
+        ? `http://localhost:3001/api/musyrif/materi/all?kategoriId=${kategoriId}`
+        : "http://localhost:3001/api/musyrif/materi/all";
+      
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setMateriOptions(data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching materi:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchAssignments();
+    fetchKategori();
+    fetchMateri();
+  }, []);
+
+  // Filter assignments
+  useEffect(() => {
+    let filtered = assignments;
+
+    // Filter by search
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (a) =>
+          a.judul.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          a.pertanyaan.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Filter by kategori
+    if (selectedKategori && selectedKategori !== "all") {
+      filtered = filtered.filter(
+        (a) => a.materi?.kategori?.id === Number(selectedKategori)
+      );
+    }
+
+    // Filter by materi
+    if (selectedMateri && selectedMateri !== "all") {
+      filtered = filtered.filter((a) => a.materiId === Number(selectedMateri));
+    }
+
+    setFilteredAssignments(filtered);
+  }, [searchTerm, selectedKategori, selectedMateri, assignments]);
+
+  // Handler functions
+  const handleView = (assignment: AssignmentData) => {
+    setSelectedAssignment(assignment);
+    setShowViewModal(true);
+  };
+
+  const handleEdit = (assignment: AssignmentData) => {
+    setSelectedAssignment(assignment);
+    setFormData({
+      judul: assignment.judul,
+      pertanyaan: assignment.pertanyaan,
+      opsiA: assignment.opsiA,
+      opsiB: assignment.opsiB,
+      opsiC: assignment.opsiC,
+      opsiD: assignment.opsiD,
+      jawabanBenar: assignment.jawabanBenar,
+      materiId: assignment.materiId?.toString() || "",
+      kategoriId: assignment.materi?.kategori?.id?.toString() || "",
+    });
+    setShowEditModal(true);
+  };
+
+  const handleDelete = (assignment: AssignmentData) => {
+    setSelectedAssignment(assignment);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedAssignment) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `http://localhost:3001/api/musyrif/assignments/${selectedAssignment.id}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil",
+          text: "Assignment berhasil dihapus",
+          confirmButtonColor: "#22c55e",
+          timer: 2000,
+        });
+        fetchAssignments();
+        setShowDeleteModal(false);
+      } else {
+        throw new Error(data.message);
+      }
+    } catch (error: any) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error.message || "Gagal menghapus assignment",
+        confirmButtonColor: "#ef4444",
+      });
+    }
+  };
+
+  const handleSaveAdd = async () => {
+    // Validasi
+    if (
+      !formData.judul ||
+      !formData.pertanyaan ||
+      !formData.opsiA ||
+      !formData.opsiB ||
+      !formData.opsiC ||
+      !formData.opsiD ||
+      !formData.jawabanBenar ||
+      !formData.materiId
+    ) {
+      Swal.fire({
+        icon: "warning",
+        title: "Perhatian",
+        text: "Semua field harus diisi!",
+        confirmButtonColor: "#f59e0b",
+      });
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:3001/api/musyrif/assignments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          judul: formData.judul,
+          pertanyaan: formData.pertanyaan,
+          opsiA: formData.opsiA,
+          opsiB: formData.opsiB,
+          opsiC: formData.opsiC,
+          opsiD: formData.opsiD,
+          jawabanBenar: formData.jawabanBenar,
+          materiId: Number(formData.materiId),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil",
+          text: "Assignment berhasil ditambahkan",
+          confirmButtonColor: "#22c55e",
+          timer: 2000,
+        });
+        fetchAssignments();
+        setShowAddModal(false);
+        resetForm();
+      } else {
+        throw new Error(data.message);
+      }
+    } catch (error: any) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error.message || "Gagal menyimpan assignment",
+        confirmButtonColor: "#ef4444",
+      });
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedAssignment) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `http://localhost:3001/api/musyrif/assignments/${selectedAssignment.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            judul: formData.judul,
+            pertanyaan: formData.pertanyaan,
+            opsiA: formData.opsiA,
+            opsiB: formData.opsiB,
+            opsiC: formData.opsiC,
+            opsiD: formData.opsiD,
+            jawabanBenar: formData.jawabanBenar,
+            materiId: Number(formData.materiId),
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil",
+          text: "Assignment berhasil diupdate",
+          confirmButtonColor: "#22c55e",
+          timer: 2000,
+        });
+        fetchAssignments();
+        setShowEditModal(false);
+        resetForm();
+      } else {
+        throw new Error(data.message);
+      }
+    } catch (error: any) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error.message || "Gagal mengupdate assignment",
+        confirmButtonColor: "#ef4444",
+      });
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      judul: "",
+      pertanyaan: "",
+      opsiA: "",
+      opsiB: "",
+      opsiC: "",
+      opsiD: "",
+      jawabanBenar: "",
+      materiId: "",
+      kategoriId: "",
+    });
+    setSelectedAssignment(null);
+  };
+
+  const handleKategoriChange = (kategoriId: string) => {
+    setFormData({ ...formData, kategoriId, materiId: "" });
+    fetchMateri(kategoriId);
+  };
+
+  return (
+    <div className="min-h-screen flex bg-white">
+      {/* ===== HEADER ===== */}
+      <header className="fixed top-0 left-0 right-0 bg-white z-30 h-16 flex items-center px-6 gap-3 border-b">
+        <img src="/lg_umy.svg" alt="UMY" className="h-10 object-contain" />
+        <img
+          src="/lg_unires.svg"
+          alt="UNIRES"
+          className="h-10 object-contain"
+        />
+      </header>
+
+      {/* ===== SIDEBAR ===== */}
+      <Sidebar isOpen={isOpen} toggleSidebar={toggleSidebar} />
+
+      {/* ===== MAIN CONTENT ===== */}
+      <main
+        className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
+          isOpen ? "ml-64" : "ml-12"
+        }`}
+      >
+        <div className="h-16" />
+
+        <header className="px-6 py-4">
+          <h1 className="bg-[#004220] text-white text-center py-6 rounded-md text-lg font-semibold">
+            Buat Assignment
+          </h1>
+        </header>
+
+        {/* ===== FILTER BAR ===== */}
+        <section className="flex flex-wrap items-center justify-between px-6 mb-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center border border-gray-300 rounded-xl px-3 py-2 shadow-sm bg-white">
+              <FaSearch className="text-gray-400 mr-2" />
+              <input
+                type="text"
+                placeholder="Cari Resident"
+                className="outline-none text-sm w-40 bg-transparent"
+              />
+            </div>
+
+            <CustomSelect
+              iconSrc="/filter_icon.svg"
+              options={["Assignment (All)", "Assignment 1", "Assignment 2"]}
+            />
+            <CustomSelect
+              iconSrc="/filter_icon.svg"
+              options={["Materi (All)", "Materi 1", "Materi 2"]}
+            />
+          </div>
+
+          {/* Tombol Tambah Assignment */}
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 bg-green-500 border border-gray-300 rounded-xl px-4 py-2 text-sm text-white hover:bg-gray-400 shadow-sm transition"
+          >
+            <div className=" border-2 border-white rounded-full p-1.5 flex items-center justify-center">
+              <FaPlus className="text-white text-xs" />
+            </div>
+            Add Assignment
+          </button>
+        </section>
+
+        {/* ===== TABLE ===== */}
+        <section className="px-6">
+          <div className="bg-white rounded-lg shadow overflow-hidden border border-[#004220]">
+            <table className="w-full text-sm border-collapse">
+              <thead className="text-[#004220] border-b border-[#004220]">
+                <tr>
+                  <th className="py-3 text-left px-4">No</th>
+                  <th className="py-3 text-left px-4">Assignment</th>
+                  <th className="py-3 text-left px-4">Materi</th>
+                  <th className="py-3 text-center px-4">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {residents.map((r, i) => (
+                  <tr
+                    key={i}
+                    className="text-[#004220] border-b border-[#004220] hover:bg-[#F7F9F8] transition"
+                  >
+                    <td className="py-3 px-4">{i + 1}</td>
+                    <td className="py-3 px-4">{r.assignment}</td>
+                    <td className="py-3 px-4">{r.materi}</td>
+                    <td className="py-3 px-4 text-center">
+                      <div className="flex items-center justify-center gap-3">
+                        <img
+                          src="/eye_icon.svg"
+                          alt="view"
+                          className="h-5 w-5 cursor-pointer hover:opacity-70"
+                          onClick={() => handleView(r)}
+                        />
+                        <img
+                          src="/edit.svg"
+                          alt="edit"
+                          className="h-5 w-5 cursor-pointer hover:opacity-70"
+                          onClick={() => handleEdit(r)}
+                        />
+                        <img
+                          src="/delete.svg"
+                          alt="delete"
+                          className="h-5 w-5 cursor-pointer hover:opacity-70"
+                          onClick={() => handleDelete(r)}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+
+      {/* ===== MODAL TAMBAH ASSIGNMENT ===== */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
+          <div className="bg-white rounded-xl p-8 w-[420px] shadow-lg">
+            <h2 className="text-lg font-semibold text-[#4A6FA5] mb-6">
+              Tambah Nilai Resident
+            </h2>
+
+            <div className="space-y-4">
+              {/* Assignment Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Assignment <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Masukkan Assignment"
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#4A6FA5]"
+                />
+              </div>
+
+              {/* Materi Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Materi <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Masukkan Materi"
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#4A6FA5]"
+                />
+              </div>
+
+              {/* Soal Inputs */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Soal <span className="text-red-500">*</span>
+                </label>
+                {questions.map((q, index) => (
+                  <input
+                    key={index}
+                    value={q}
+                    onChange={(e) =>
+                      handleChangeQuestion(index, e.target.value)
+                    }
+                    placeholder={`${index + 1}.`}
+                    className="mt-2 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#4A6FA5]"
+                  />
+                ))}
+                <button
+                  type="button"
+                  onClick={handleAddQuestion}
+                  className="w-full mt-2 border border-gray-300 text-gray-600 text-sm py-2 rounded-lg hover:bg-gray-100 transition"
+                >
+                  Tambah Kolom Soal
+                </button>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 bg-[#4A6FA5] text-white rounded-lg text-sm hover:bg-[#3b5c8a]"
+                onClick={() => {
+                  setShowAddModal(false);
+                  Swal.fire({
+                    icon: "success",
+                    title: "Data berhasil disimpan",
+                    showConfirmButton: true,
+                    confirmButtonColor: "#22c55e",
+                    confirmButtonText: "OK",
+                    timer: 3000,
+                  });
+                }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== MODAL EDIT ===== */}
+      {showEditModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-[400px]">
+            <h2 className="text-lg font-semibold text-[#004220] mb-4">
+              Edit Assignment
+            </h2>
+            <label className="block text-sm mb-2">Assignment</label>
+            <input
+              type="text"
+              value={selectedResident?.assignment || ""}
+              onChange={(e) =>
+                setSelectedResident({
+                  ...selectedResident,
+                  assignment: e.target.value,
+                })
+              }
+              className="border border-gray-300 rounded-md w-full px-3 py-2 mb-4"
+            />
+            <label className="block text-sm mb-2">Materi</label>
+            <input
+              type="text"
+              value={selectedResident?.materi || ""}
+              onChange={(e) =>
+                setSelectedResident({
+                  ...selectedResident,
+                  materi: e.target.value,
+                })
+              }
+              className="border border-gray-300 rounded-md w-full px-3 py-2 mb-4"
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                className="px-4 py-2 bg-gray-300 rounded-md"
+                onClick={() => setShowEditModal(false)}
+              >
+                Batal
+              </button>
+              <button
+                className="px-4 py-2 bg-[#004220] text-white rounded-md"
+                onClick={() => {
+                  console.log("Data disimpan:", selectedResident);
+                  setShowEditModal(false);
+                  Swal.fire({
+                    icon: "success",
+                    title: "Data berhasil disimpan",
+                    showConfirmButton: true,
+                    confirmButtonColor: "#22c55e",
+                    confirmButtonText: "OK",
+                    timer: 3000,
+                  });
+                }}
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== MODAL DELETE ===== */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-[350px] text-center">
+            <h2 className="text-lg font-semibold text-[#004220] mb-4">
+              Hapus Assignment?
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Apakah kamu yakin ingin menghapus{" "}
+              <span className="font-semibold">
+                {selectedResident?.assignment}
+              </span>
+              ?
+            </p>
+            <div className="flex justify-center gap-4">
+              <button
+                className="px-4 py-2 bg-gray-300 rounded-md"
+                onClick={() => setShowDeleteModal(false)}
+              >
+                Batal
+              </button>
+              <button
+                className="px-4 py-2 bg-red-600 text-white rounded-md"
+                onClick={handleConfirmDelete}
+              >
+                Hapus
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

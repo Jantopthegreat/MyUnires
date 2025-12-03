@@ -1,0 +1,495 @@
+"use client";
+import { useState, useEffect } from "react";
+import { FaSearch, FaPlus } from "react-icons/fa";
+import Sidebar from "@/components/Sidebar";
+import CustomSelect from "@/components/CustomSelect";
+import AddAssignmentModal from "@/components/AddAssignmentModal";
+import Swal from "sweetalert2";
+
+interface AssignmentData {
+  id: number;
+  judul: string;
+  pertanyaan: string;
+  opsiA: string;
+  opsiB: string;
+  opsiC: string;
+  opsiD: string;
+  jawabanBenar: string;
+  _count?: {
+    jawaban: number;
+  };
+}
+
+interface MateriOption {
+  id: number;
+  judul: string;
+}
+
+export default function AssignmentPage() {
+  const [isOpen, setIsOpen] = useState(true);
+  const toggleSidebar = () => setIsOpen((prev) => !prev);
+
+  // State data
+  const [assignments, setAssignments] = useState<AssignmentData[]>([]);
+  const [filteredData, setFilteredData] = useState<AssignmentData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedMateri, setSelectedMateri] = useState("all");
+  const [materiOptions, setMateriOptions] = useState<MateriOption[]>([]);
+
+  // Modal states
+  const [showModal, setShowModal] = useState(false);
+  const [modalMode, setModalMode] = useState<"add" | "edit" | "view">("add");
+  const [selectedAssignment, setSelectedAssignment] = useState<AssignmentData | null>(null);
+
+  // Fetch assignments dari backend
+  const fetchAssignments = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`http://localhost:3001/api/musyrif/assignments`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error("Gagal mengambil data");
+
+      const result = await response.json();
+      if (result.success) {
+        setAssignments(result.data);
+        setFilteredData(result.data);
+      }
+    } catch (error) {
+      console.error("Error fetching assignments:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Gagal mengambil data assignment",
+        confirmButtonColor: "#004220",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch materi untuk dropdown
+  const fetchMateri = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`http://localhost:3001/api/musyrif/materi/all`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setMateriOptions(result.data);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching materi:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchAssignments();
+    fetchMateri();
+  }, []);
+
+  // Filter data
+  useEffect(() => {
+    let filtered = [...assignments];
+
+    // Filter by search
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (item) =>
+          item.judul.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.pertanyaan.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    setFilteredData(filtered);
+  }, [searchTerm, selectedMateri, assignments]);
+
+  // Handlers
+  const handleAdd = () => {
+    setModalMode("add");
+    setSelectedAssignment(null);
+    setShowModal(true);
+  };
+
+  const handleView = (assignment: AssignmentData) => {
+    setModalMode("view");
+    setSelectedAssignment(assignment);
+    setShowModal(true);
+  };
+
+  const handleEdit = (assignment: AssignmentData) => {
+    setModalMode("edit");
+    setSelectedAssignment(assignment);
+    setShowModal(true);
+  };
+
+  const handleDelete = async (assignment: AssignmentData) => {
+    const result = await Swal.fire({
+      title: "Hapus Assignment?",
+      text: `Apakah Anda yakin ingin menghapus "${assignment.judul}"?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Ya, Hapus!",
+      cancelButtonText: "Batal",
+    });
+
+    if (result.isConfirmed) {
+      await deleteAssignment(assignment.id);
+    }
+  };
+
+  const deleteAssignment = async (id: number) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`http://localhost:3001/api/musyrif/assignments/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error("Gagal menghapus");
+
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil",
+        text: "Assignment berhasil dihapus",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
+      fetchAssignments();
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Gagal menghapus assignment",
+        confirmButtonColor: "#004220",
+      });
+    }
+  };
+
+  const handleSave = async (data: any) => {
+    try {
+      const token = localStorage.getItem("token");
+      const url =
+        modalMode === "add"
+          ? "http://localhost:3001/api/musyrif/assignments"
+          : `http://localhost:3001/api/musyrif/assignments/${selectedAssignment?.id}`;
+
+      const method = modalMode === "add" ? "POST" : "PUT";
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) throw new Error("Gagal menyimpan");
+
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil",
+        text: `Assignment berhasil ${modalMode === "add" ? "ditambahkan" : "diupdate"}`,
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
+      setShowModal(false);
+      fetchAssignments();
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Gagal menyimpan assignment",
+        confirmButtonColor: "#004220",
+      });
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex bg-white">
+      {/* ===== HEADER ===== */}
+      <header className="fixed top-0 left-0 right-0 bg-white z-30 h-16 flex items-center px-6 gap-3 border-b">
+        <img src="/lg_umy.svg" alt="UMY" className="h-10 object-contain" />
+        <img
+          src="/lg_unires.svg"
+          alt="UNIRES"
+          className="h-10 object-contain"
+        />
+      </header>
+
+      {/* ===== SIDEBAR ===== */}
+      <Sidebar isOpen={isOpen} toggleSidebar={toggleSidebar} />
+
+      {/* ===== MAIN CONTENT ===== */}
+      <main
+        className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
+          isOpen ? "ml-64" : "ml-12"
+        }`}
+      >
+        <div className="h-16" />
+
+        <header className="px-6 py-4">
+          <h1 className="bg-[#004220] text-white text-center py-6 rounded-md text-lg font-semibold">
+            Buat Assignment
+          </h1>
+        </header>
+
+        {/* ===== FILTER BAR ===== */}
+        <section className="flex flex-wrap items-center justify-between px-6 mb-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center border border-gray-300 rounded-xl px-3 py-2 shadow-sm bg-white">
+              <FaSearch className="text-gray-400 mr-2" />
+              <input
+                type="text"
+                placeholder="Cari Data"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="outline-none text-sm w-40 bg-transparent"
+              />
+            </div>
+
+            <CustomSelect
+              iconSrc="/filter_icon.svg"
+              options={[
+                "Materi (All)",
+                ...materiOptions.map((m) => m.judul),
+              ]}
+              onChange={(value) => {
+                if (value === "Materi (All)") {
+                  setSelectedMateri("all");
+                } else {
+                  setSelectedMateri(value);
+                }
+              }}
+            />
+          </div>
+
+          {/* Tombol Tambah Assignment */}
+          <button
+            onClick={handleAdd}
+            className="flex items-center gap-2 bg-green-500 border border-gray-300 rounded-xl px-4 py-2 text-sm text-white hover:bg-green-600 shadow-sm transition"
+          >
+            <div className="border-2 border-white rounded-full p-1.5 flex items-center justify-center">
+              <FaPlus className="text-white text-xs" />
+            </div>
+            Add Assignment
+          </button>
+        </section>
+
+        {/* ===== TABLE ===== */}
+        <section className="px-6">
+          <div className="bg-white rounded-lg shadow overflow-hidden border border-[#004220]">
+            {loading ? (
+              <div className="text-center py-10 text-gray-500">Memuat data...</div>
+            ) : filteredData.length === 0 ? (
+              <div className="text-center py-10 text-gray-500">
+                Tidak ada data assignment
+              </div>
+            ) : (
+              <table className="w-full text-sm border-collapse">
+                <thead className="text-[#004220] border-b border-[#004220]">
+                  <tr>
+                    <th className="py-3 text-left px-4">No</th>
+                    <th className="py-3 text-left px-4">Assignment</th>
+                    <th className="py-3 text-left px-4">Materi</th>
+                    <th className="py-3 text-center px-4">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredData.map((assignment, i) => (
+                    <tr
+                      key={assignment.id}
+                      className="text-[#004220] border-b border-[#004220] hover:bg-[#F7F9F8] transition"
+                    >
+                      <td className="py-3 px-4">{i + 1}</td>
+                      <td className="py-3 px-4 font-semibold">{assignment.judul}</td>
+                      <td className="py-3 px-4">-</td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex items-center justify-center gap-3">
+                          <img
+                            src="/eye_icon.svg"
+                            alt="view"
+                            className="h-5 w-5 cursor-pointer hover:opacity-70"
+                            onClick={() => handleView(assignment)}
+                          />
+                          <img
+                            src="/edit.svg"
+                            alt="edit"
+                            className="h-5 w-5 cursor-pointer hover:opacity-70"
+                            onClick={() => handleEdit(assignment)}
+                          />
+                          <img
+                            src="/delete.svg"
+                            alt="delete"
+                            className="h-5 w-5 cursor-pointer hover:opacity-70"
+                            onClick={() => handleDelete(assignment)}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </section>
+      </main>
+
+      {/* ===== MODAL ===== */}
+      <AddAssignmentModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onSave={handleSave}
+        mode={modalMode}
+        data={selectedAssignment}
+      />
+    </div>
+  );
+}
+
+  return (
+    <div className="min-h-screen flex bg-white">
+      {/* ===== HEADER ===== */}
+      <header className="fixed top-0 left-0 right-0 bg-white z-30 h-16 flex items-center px-6 gap-3 border-b">
+        <img src="/lg_umy.svg" alt="UMY" className="h-10 object-contain" />
+        <img
+          src="/lg_unires.svg"
+          alt="UNIRES"
+          className="h-10 object-contain"
+        />
+      </header>
+
+      {/* ===== SIDEBAR ===== */}
+      <Sidebar isOpen={isOpen} toggleSidebar={toggleSidebar} />
+
+      {/* ===== MAIN CONTENT ===== */}
+      <main
+        className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
+          isOpen ? "ml-64" : "ml-12"
+        }`}
+      >
+        <div className="h-16" />
+
+        <header className="px-6 py-4">
+          <h1 className="bg-[#004220] text-white text-center py-6 rounded-md text-lg font-semibold">
+            Buat Assignment
+          </h1>
+        </header>
+
+        {/* ===== FILTER BAR ===== */}
+        <section className="flex flex-wrap items-center justify-between px-6 mb-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center border border-gray-300 rounded-xl px-3 py-2 shadow-sm bg-white">
+              <FaSearch className="text-gray-400 mr-2" />
+              <input
+                type="text"
+                placeholder="Cari Resident"
+                className="outline-none text-sm w-40 bg-transparent"
+              />
+            </div>
+
+            <CustomSelect
+              iconSrc="/filter_icon.svg"
+              options={["Assignment (All)", "Assignment 1", "Assignment 2"]}
+            />
+            <CustomSelect
+              iconSrc="/filter_icon.svg"
+              options={["Materi (All)", "Materi 1", "Materi 2"]}
+            />
+          </div>
+
+          {/* Tombol Tambah Assignment */}
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 bg-green-500 border border-gray-300 rounded-xl px-4 py-2 text-sm text-white hover:bg-gray-400 shadow-sm transition"
+          >
+            <div className=" border-2 border-white rounded-full p-1.5 flex items-center justify-center">
+              <FaPlus className="text-white text-xs" />
+            </div>
+            Add Assignment
+          </button>
+        </section>
+
+        {/* ===== TABLE ===== */}
+        <section className="px-6">
+          <div className="bg-white rounded-lg shadow overflow-hidden border border-[#004220]">
+            <table className="w-full text-sm border-collapse">
+              <thead className="text-[#004220] border-b border-[#004220]">
+                <tr>
+                  <th className="py-3 text-left px-4">No</th>
+                  <th className="py-3 text-left px-4">Assignment</th>
+                  <th className="py-3 text-left px-4">Materi</th>
+                  <th className="py-3 text-center px-4">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {residents.map((r, i) => (
+                  <tr
+                    key={i}
+                    className="text-[#004220] border-b border-[#004220] hover:bg-[#F7F9F8] transition"
+                  >
+                    <td className="py-3 px-4">{i + 1}</td>
+                    <td className="py-3 px-4">{r.assignment}</td>
+                    <td className="py-3 px-4">{r.materi}</td>
+                    <td className="py-3 px-4 text-center">
+                      <div className="flex items-center justify-center gap-3">
+                        <img
+                          src="/eye_icon.svg"
+                          alt="view"
+                          className="h-5 w-5 cursor-pointer hover:opacity-70"
+                          onClick={() => handleView(r)}
+                        />
+                        <img
+                          src="/edit.svg"
+                          alt="edit"
+                          className="h-5 w-5 cursor-pointer hover:opacity-70"
+                          onClick={() => handleEdit(assignment)}
+                        />
+                        <img
+                          src="/delete.svg"
+                          alt="delete"
+                          className="h-5 w-5 cursor-pointer hover:opacity-70"
+                          onClick={() => handleDelete(assignment)}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            )}
+          </div>
+        </section>
+      </main>
+
+      {/* ===== MODAL ===== */}
+      <AddAssignmentModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onSave={handleSave}
+        mode={modalMode}
+        data={selectedAssignment}
+      />
+    </div>
+  );
+}
