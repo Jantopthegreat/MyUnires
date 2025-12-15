@@ -9,9 +9,8 @@ import { showResidentDetail, showAddEditResidentModal, confirmDeleteResident, Re
 import { handleExcelImport } from "@/lib/excelImport"; 
 import { clearAuth } from "@/lib/api";
 import ResidentFilterBar from "@/components/ResidentFilterBar"; 
-import ResidentTable from "@/components/adminResidentTable"; 
-import AdminSidebar from "@/components/adminsidebar"; // ✅ Menggunakan Sidebar Admin yang baru
-
+import ResidentTable from "@/components/ResidentTable";
+// import AdminSidebar from "@/components/adminsidebar"; // ✅ Menggunakan Sidebar Admin yang baru
 // ... (Komponen AddResidentButton dan Logika CRUD/Import tetap sama)
 
 const ALLOWED_ROLES = ["ADMIN"];
