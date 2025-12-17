@@ -8,18 +8,37 @@ datasource db {
 }
 
 model User {
-  id        Int       @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   name      String
-  email     String    @unique
-  password  String
-  role      Role
-  createdAt DateTime  @default(now())
+  email     String   @unique
 
-  // Relasi ke entitas lain
+  // ubah jadi nullable supaya admin bisa buat akun tanpa password
+  password  String?  
+
+  role      Role
+  isActive  Boolean  @default(false) // aktif setelah set password via email
+
+  createdAt DateTime @default(now())
+
   resident  Resident?
   musyrif   Musyrif?
   asisten   AsistenMusyrif?
+
+  activationTokens AccountActivationToken[]
 }
+
+model AccountActivationToken {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 
 model Resident {
   id         Int       @id @default(autoincrement())
@@ -121,6 +140,7 @@ model Assignment {
   opsiC       String
   opsiD       String
   jawabanBenar String
+  soalImageUrl String?   // URL gambar soal (opsional)
   createdAt   DateTime  @default(now())
 
   materi      Materi    @relation(fields: [materiId], references: [id], onDelete: Cascade)
@@ -182,6 +202,7 @@ model SubTargets {
 
 model NilaiTahfidz {
   id              Int             @id @default(autoincrement())
+  soalImageUrl String?  // URL gambar soal (opsional)
   residentId      Int
   targetHafalanId Int
   status          String

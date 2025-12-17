@@ -1,31 +1,21 @@
 "use client";
 
-interface Resident {
-  id: number;
-  userId: number;
-  name: string;
-  email: string;
-  nim: string;
-  noUnires: string;
-  jurusan: string;
-  angkatan: number;
-  usroh: string;
-  usrohId: number | null;
-  asrama: string;
-  lantaiId: number | null;
-  noTelp: string;
-}
+import type { Resident } from "@/types/resident";
 
 interface ResidentTableProps {
   residents: Resident[];
   loading: boolean;
   onViewDetail: (resident: Resident) => void;
+  onEdit?: (resident: Resident) => void;
+  onDelete?: (resident: Resident) => void;
 }
 
 export default function ResidentTable({
   residents,
   loading,
   onViewDetail,
+  onEdit,
+  onDelete,
 }: ResidentTableProps) {
   if (loading) {
     return (
@@ -66,9 +56,10 @@ export default function ResidentTable({
             >
               <td className="py-3 px-4">{i + 1}</td>
               <td className="py-3 px-4">{r.name}</td>
-              <td className="py-3 px-4">{r.nim}</td>
-              <td className="py-3 px-4">{r.usroh}</td>
-              <td className="py-3 px-4">{r.asrama}</td>
+              <td className="py-3 px-4">{r.nim || r.uniresNumber}</td>
+              <td className="py-3 px-4">{r.usroh || r.usrohName}</td>
+              <td className="py-3 px-4">{r.asrama || "-"}</td>
+              <td className="py-3 px-4">{r.asrama || "-"}</td>
               <td className="py-3 px-4 text-center">
                 <button onClick={() => onViewDetail(r)}>
                   <img
@@ -77,6 +68,24 @@ export default function ResidentTable({
                     className="h-5 mx-auto cursor-pointer hover:opacity-70 transition"
                   />
                 </button>
+                {onEdit && (
+                  <button onClick={() => onEdit(r)} className="ml-2">
+                    <img
+                      src="/edit_icon.svg"
+                      alt="edit"
+                      className="h-5 mx-auto cursor-pointer hover:opacity-70 transition"
+                    />
+                  </button>
+                )}
+                {onDelete && (
+                  <button onClick={() => onDelete(r)} className="ml-2">
+                    <img
+                      src="/delete_icon.svg"
+                      alt="delete"
+                      className="h-5 mx-auto cursor-pointer hover:opacity-70 transition"
+                    />
+                  </button>
+                )}
               </td>
             </tr>
           ))}

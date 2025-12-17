@@ -1,8 +1,19 @@
 export type Resident = {
-  id: string;          // sesuaikan dengan backend (string/number)
+  id: number;          // sesuaikan dengan backend (string/number)
+  userId: number;
   name: string;
-  usrohName: string;
-  uniresNumber: string;
+  email: string;
+  nim: string;
+  noUnires: string;
+  jurusan: string;
+  angkatan: number;
+  usroh: string;
+  usrohName?: string;
+  usrohId: number | null;
+  asrama: string;
+  lantaiId: number | null;
+  noTelp: string;
+  uniresNumber?: string;
 };
 
 export type Paginated<T> = {

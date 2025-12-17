@@ -1,26 +1,11 @@
 // src/lib/residentModal.ts
+import type { Resident } from "@/types/resident";
 import Swal from "sweetalert2";
 import { apiPost, apiPut, apiDelete } from "@/lib/api"; 
 
 // ==========================================================
 // TIPE DATA LOKAL
 // ==========================================================
-
-export interface Resident {
-  id: number;
-  userId: number;
-  name: string;
-  email: string;
-  nim: string;
-  noUnires: string;
-  jurusan: string;
-  angkatan: number;
-  usroh: string;
-  usrohId: number | null;
-  asrama: string;
-  lantaiId: number | null;
-  noTelp: string;
-}
 
 interface ApiResponse<T = any> {
   success: boolean;

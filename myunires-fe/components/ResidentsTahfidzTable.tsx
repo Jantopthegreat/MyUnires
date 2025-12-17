@@ -4,10 +4,10 @@ import React from "react";
 
 /** Bentuk data baris tabel (sesuaikan kalau field backend-mu berbeda) */
 export type ResidentRow = {
-  id: string;
+  id: number;
   name: string;         // Nama Lengkap
-  usrohName: string;    // Nama Usroh
-  uniresNumber: string; // No Unires
+  usrohName?: string;    // Nama Usroh
+  uniresNumber?: string; // No Unires
 };
 
 export default function ResidentsTahfidzTable({
@@ -54,8 +54,8 @@ export default function ResidentsTahfidzTable({
               >
                 <td className="px-4 py-3">{i + 1}</td>
                 <td className="px-4 py-3">{r.name}</td>
-                <td className="px-4 py-3">{r.usrohName}</td>
-                <td className="px-4 py-3">{r.uniresNumber}</td>
+                <td className="px-4 py-3">{r.usrohName || "-"}</td>
+                <td className="px-4 py-3">{r.uniresNumber || "-"}</td>
                 <td className="px-2 py-3">
                   <button
                     onClick={() => onInput?.(r)}

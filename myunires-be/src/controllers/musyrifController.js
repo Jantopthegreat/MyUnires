@@ -361,7 +361,7 @@ export const getResidentsByMusyrif = async (req, res) => {
       where: { lantaiId: musyrif.lantaiId },
       include: {
         user: { select: { id: true, name: true, email: true } },
-        usroh: { select: { nama: true } },
+        usroh: { select: { id: true, nama: true } },
       },
       orderBy: { id: "asc" },
     });
@@ -377,6 +377,8 @@ export const getResidentsByMusyrif = async (req, res) => {
         jurusan: r.jurusan,
         angkatan: r.angkatan,
         usroh: r.usroh?.nama || "-",
+        usrohId: r.usroh?.id || null,
+        lantaiId: r.lantaiId || null,
         noTelp: r.noTelp || "-",
       })),
     });
@@ -950,6 +952,8 @@ export const getAllAssignments = async (req, res) => {
       orderBy: { createdAt: "desc" },
     });
 
+    console.log("✅ Assignments from DB:", assignments.map(a => ({ id: a.id, soalImageUrl: a.soalImageUrl }))); // Debug log
+
     res.status(200).json({
       success: true,
       data: assignments,
@@ -1009,7 +1013,7 @@ export const createAssignment = async (req, res) => {
   try {
     console.log("📝 CREATE ASSIGNMENT - Request body:", req.body);
     
-    const { materiId, judul, pertanyaan, opsiA, opsiB, opsiC, opsiD, jawabanBenar } = req.body;
+    const { materiId, judul, pertanyaan, opsiA, opsiB, opsiC, opsiD, jawabanBenar, soalImageUrl } = req.body;
 
     console.log("📝 Extracted fields:", { materiId, judul, pertanyaan, opsiA, opsiB, opsiC, opsiD, jawabanBenar });
 
@@ -1055,6 +1059,7 @@ export const createAssignment = async (req, res) => {
         opsiC,
         opsiD,
         jawabanBenar,
+        ...(soalImageUrl !== undefined && { soalImageUrl }),
       },
       include: {
         materi: {
@@ -1092,12 +1097,40 @@ export const createAssignment = async (req, res) => {
 };
 
 /**
+ * Upload assignment image (returns URL)
+ */
+export const uploadAssignmentImage = async (req, res) => {
+  try {
+    console.log('📁 uploadAssignmentImage called. req.file:', req.file && {
+      originalname: req.file.originalname,
+      filename: req.file.filename,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      destination: req.file.destination,
+      path: req.file.path,
+    });
+
+    if (!req.file) {
+      console.warn('⚠️ uploadAssignmentImage - no file in request');
+      return res.status(400).json({ success: false, message: 'File is required.' });
+    }
+
+    const fileUrl = `/uploads/assignments/${req.file.filename}`;
+    console.log('✅ File uploaded successfully, fileUrl=', fileUrl);
+    res.status(200).json({ success: true, url: fileUrl });
+  } catch (error) {
+    console.error('❌ Error uploadAssignmentImage:', error);
+    res.status(500).json({ success: false, message: 'Terjadi kesalahan server.', error: error.message });
+  }
+};
+
+/**
  * ✅ Update assignment
  */
 export const updateAssignment = async (req, res) => {
   try {
     const { id } = req.params;
-    const { materiId, judul, pertanyaan, opsiA, opsiB, opsiC, opsiD, jawabanBenar } = req.body;
+    const { materiId, judul, pertanyaan, opsiA, opsiB, opsiC, opsiD, jawabanBenar, soalImageUrl } = req.body;
 
     // Cek apakah assignment ada
     const existingAssignment = await prisma.assignment.findUnique({
@@ -1144,6 +1177,7 @@ export const updateAssignment = async (req, res) => {
         ...(opsiC && { opsiC }),
         ...(opsiD && { opsiD }),
         ...(jawabanBenar && { jawabanBenar }),
+        ...(soalImageUrl !== undefined && { soalImageUrl }),
       },
       include: {
         materi: {

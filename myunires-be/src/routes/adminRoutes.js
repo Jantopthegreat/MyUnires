@@ -45,6 +45,8 @@ import {
   createSubTarget,
   updateSubTarget,
   deleteSubTarget,
+  getAdminSummary,
+  getTahfidzProgressByTarget,
 
 
 } from "../controllers/adminController.js";
@@ -52,6 +54,14 @@ import { verifyToken, isAdmin } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 const upload = multer({ dest: "uploads/" });
+
+
+// ✅ Summary Dashboard Admin
+
+router.get("/summary", verifyToken, isAdmin, getAdminSummary);
+router.get("/tahfidz/progress-target", verifyToken, isAdmin, getTahfidzProgressByTarget);
+
+
 
 // ✅ CRUD Resident
 router.get("/resident", verifyToken, isAdmin, getAllResident);

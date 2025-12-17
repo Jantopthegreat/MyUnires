@@ -31,7 +31,7 @@ export default function InputNilaiTahfidzModal({
   const [loadingDD, setLoadingDD] = useState(false);
 
   // form state
-  const [residentId, setResidentId] = useState<string>(resident?.id ?? "");
+  const [residentId, setResidentId] = useState<string>(resident?.id?.toString() ?? "");
   const [usrohId, setUsrohId] = useState<string>("");
   const [grade, setGrade] = useState<GradeLetter | "">("");
   const [submitting, setSubmitting] = useState(false);
@@ -56,7 +56,7 @@ export default function InputNilaiTahfidzModal({
 
   // sinkron resident preselect (jika dipanggil dari baris tabel)
   useEffect(() => {
-    if (resident?.id) setResidentId(resident.id);
+    if (resident?.id) setResidentId(resident.id.toString());
     else setResidentId("");
   }, [resident?.id]);
 

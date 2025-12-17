@@ -38,9 +38,8 @@ const TahfidzModal: React.FC<TahfidzModalProps> = ({
   const [form, setForm] = useState({
     residentId: "",
     targetHafalanId: "",
-    surah: "",
+    status: "",
     nilaiHuruf: "",
-    tanggal: "",
   });
 
   useEffect(() => {
@@ -48,17 +47,15 @@ const TahfidzModal: React.FC<TahfidzModalProps> = ({
       setForm({
         residentId: String(data.residentId),
         targetHafalanId: String(data.targetHafalanId),
-        surah: data.surah || "",
+        status: data.status || "",
         nilaiHuruf: data.nilaiHuruf || "",
-        tanggal: data.tanggal ? data.tanggal.slice(0, 10) : "",
       });
     } else {
       setForm({
         residentId: "",
         targetHafalanId: "",
-        surah: "",
+        status: "",
         nilaiHuruf: "",
-        tanggal: "",
       });
     }
   }, [isOpen, mode, data]);
@@ -71,12 +68,20 @@ const TahfidzModal: React.FC<TahfidzModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
-      ...form,
+    // Payload sesuai model
+    const cleanedForm = {
       residentId: Number(form.residentId),
       targetHafalanId: Number(form.targetHafalanId),
-      tanggal: form.tanggal,
-    });
+      status: form.status.trim(),
+      nilaiHuruf: form.nilaiHuruf.trim(),
+    };
+    // Validasi frontend (pastikan semua field wajib diisi)
+    const isValid = cleanedForm.residentId && cleanedForm.targetHafalanId && cleanedForm.status !== '';
+    if (!isValid) {
+      alert('Semua field wajib diisi!');
+      return;
+    }
+    onSave(cleanedForm);
   };
 
   if (!isOpen) return null;
@@ -100,7 +105,7 @@ const TahfidzModal: React.FC<TahfidzModalProps> = ({
               <option value="">Pilih Resident</option>
               {residents.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.nama} ({r.nim})
+                  {r.name} ({r.nim})
                 </option>
               ))}
             </select>
@@ -124,16 +129,20 @@ const TahfidzModal: React.FC<TahfidzModalProps> = ({
               ))}
             </select>
           </div>
+          {/* Status Dropdown */}
           <div>
-            <label className="block text-sm font-medium mb-1">Surah</label>
-            <input
-              type="text"
-              name="surah"
-              value={form.surah}
+            <label className="block text-sm font-medium mb-1">Status <span className="text-red-500">*</span></label>
+            <select
+              name="status"
+              value={form.status}
               onChange={handleChange}
               className="w-full border rounded px-3 py-2"
               required
-            />
+            >
+              <option value="">Pilih Status</option>
+              <option value="Lulus">Lulus</option>
+              <option value="Belum Lulus">Belum Lulus</option>
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">
@@ -159,19 +168,7 @@ const TahfidzModal: React.FC<TahfidzModalProps> = ({
               <option value="E">E</option>
             </select>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Tanggal Penilaian
-            </label>
-            <input
-              type="date"
-              name="tanggal"
-              value={form.tanggal}
-              onChange={handleChange}
-              className="w-full border rounded px-3 py-2"
-              required
-            />
-          </div>
+          {/* Tanggal & Surah dihapus karena tidak ada di model backend */}
           <div className="flex justify-end gap-2 mt-6">
             <button
               type="button"

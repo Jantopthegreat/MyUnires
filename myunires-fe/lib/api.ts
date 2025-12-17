@@ -103,6 +103,33 @@ export async function apiDelete<T>(path: string, init?: RequestInit) {
     return {} as T;
   }
 }
+
+/**
+ * Helper untuk upload file (FormData).
+ */
+export async function apiUpload<T>(
+  path: string,
+  formData: FormData,
+  init?: RequestInit
+) {
+  const url = `${API_BASE}${path}`;
+  const token = getToken();
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers || {})
+    },
+    body: formData,
+    cache: "no-store",
+    ...init,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`POST ${url} -> ${res.status} ${res.statusText} ${text}`);
+  }
+  return (await res.json()) as T;
+}
 // ============ Auth Helpers ============
 
 export interface LoginResponse {
@@ -163,3 +190,66 @@ export function getRedirectPath(role: string): string {
       return "/login";
   }
 }
+
+export type AdminSummaryResponse = {
+  success: boolean;
+  message: string;
+  data: {
+    residentCount: number;
+    musyrifCount: number;
+    asistenCount: number;
+    updatedAt?: string;
+  };
+};
+
+export function getAdminSummary() {
+  return apiGet<AdminSummaryResponse>("/api/admin/summary");
+}
+
+export type TargetProgressRow = {
+  targetId: number;
+  nama: string;
+  surah: string;
+  ayatMulai: number;
+  ayatAkhir: number;
+  selesai: number;
+  belum: number;
+};
+
+export type TahfidzProgressResponse = {
+  success: boolean;
+  message?: string;
+  data: TargetProgressRow[];
+};
+
+export function getTahfidzProgressByTarget() {
+  return apiGet<TahfidzProgressResponse>("/api/admin/tahfidz/progress-target");
+}
+
+export async function apiUploadPut<T>(
+  path: string,
+  formData: FormData,
+  init?: RequestInit
+) {
+  const url = `${API_BASE}${path}`;
+  const token = getToken();
+
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers || {}),
+    },
+    body: formData,
+    cache: "no-store",
+    ...init,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`PUT ${url} -> ${res.status} ${res.statusText} ${text}`);
+  }
+
+  return (await res.json()) as T;
+}
+

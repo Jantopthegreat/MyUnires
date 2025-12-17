@@ -1,5 +1,7 @@
 // src/controllers/asistenController.js
 import { prisma } from "../config/prisma.js";
+// Re-export assignment handlers dari musyrifController agar asisten punya akses CRUD assignment
+export { getAllAssignments, getAssignmentById, createAssignment, updateAssignment, deleteAssignment, uploadAssignmentImage, getAllKategoriMateri } from "./musyrifController.js";
 
 /* ==========================================================
    👨‍🎓 ASISTEN MUSYRIF CONTROLLER
@@ -70,7 +72,10 @@ export const getAllNilaiTahfidzByAsisten = async (req, res) => {
       },
       include: {
         resident: {
-          include: { user: { select: { name: true, email: true } } },
+          include: {
+            user: { select: { name: true, email: true } },
+            usroh: { select: { id: true, nama: true } },
+          },
         },
         targetHafalan: { select: { nama: true, surah: true } },
       },
@@ -83,7 +88,10 @@ export const getAllNilaiTahfidzByAsisten = async (req, res) => {
       data: nilaiTahfidz.map((n) => ({
         id: n.id,
         resident: n.resident.user.name,
+        nim: n.resident.nim || "-",
         email: n.resident.user.email,
+        usrohId: n.resident.usroh?.id,
+        usroh: n.resident.usroh?.nama,
         target: n.targetHafalan.nama,
         surah: n.targetHafalan.surah,
         status: n.status,
@@ -191,3 +199,46 @@ export const getMateri = async (req, res) => {
     res.status(500).json({ message: "Terjadi kesalahan server." });
   }
 };
+
+/**
+ * ✅ Lihat semua usroh (untuk dropdown filter)
+ */
+export const getAllUsroh = async (req, res) => {
+  try {
+    const usrohList = await prisma.usroh.findMany({
+      select: { id: true, nama: true },
+      orderBy: { nama: "asc" },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Daftar usroh berhasil diambil.",
+      data: usrohList,
+    });
+  } catch (error) {
+    console.error("❌ Error getAllUsroh (asisten):", error);
+    res.status(500).json({ message: "Terjadi kesalahan server." });
+  }
+};
+
+/**
+ * ✅ Lihat semua target hafalan (untuk dropdown)
+ */
+export const getAllTargetHafalan = async (req, res) => {
+  try {
+    const targetList = await prisma.targetHafalan.findMany({
+      select: { id: true, nama: true, surah: true, ayatMulai: true, ayatAkhir: true },
+      orderBy: { nama: "asc" },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Daftar target hafalan berhasil diambil.",
+      data: targetList,
+    });
+  } catch (error) {
+    console.error("❌ Error getAllTargetHafalan (asisten):", error);
+    res.status(500).json({ message: "Terjadi kesalahan server." });
+  }
+};
+

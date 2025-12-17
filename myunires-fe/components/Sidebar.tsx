@@ -28,34 +28,67 @@ export default function Sidebar({ isOpen, toggleSidebar }: Props) {
     return name.charAt(0).toUpperCase();
   };
 
-  // Daftar menu navigasi
-  const menuItems = [
-    {
-      title: "Dashboard",
-      icon: "/dashboard.svg", // kamu bisa ganti file SVG-nya ke icon home
-      href: "/pembina/dashboard",
-    },
-    {
-      title: "Resident Per Lantai",
-      icon: "/res_perlantai.svg",
-      href: "/pembina/dashboard/resident",
-    },
-    {
-      title: "Nilai Tahfidz",
-      icon: "/tinjau_nilaiTahfidz.svg",
-      href: "/pembina/dashboard/tahfidz",
-    },
-    {
-      title: "Revisi Nilai",
-      icon: "/rev_nilaiTahfidz.svg",
-      href: "/pembina/dashboard/revisi",
-    },
-    {
-      title: "Buat Assignment",
-      icon: "/assigment.svg",
-      href: "/pembina/dashboard/assignment",
-    },
-  ];
+  // Daftar menu navigasi - berbeda untuk setiap role
+  const getMenuItems = () => {
+    const role = userData?.role || "";
+    
+    // Menu untuk ASISTEN_MUSYRIF
+    if (role === "ASISTEN") {
+      return [
+        {
+          title: "Dashboard",
+          icon: "/dashboard.svg",
+          href: "/dashboard/asisten-musyrif",
+        },
+        {
+          title: "Resident Per Usroh",
+          icon: "/res_perlantai.svg",
+          href: "/dashboard/asisten-musyrif/resident-per-usroh",
+        },
+        {
+          title: "Input Nilai Tahfidz",
+          icon: "/tinjau_nilaiTahfidz.svg",
+          href: "/dashboard/asisten-musyrif/input-nilai-tahfidz",
+        },
+        {
+          title: "Buat Assignment",
+          icon: "/assigment.svg",
+          href: "/dashboard/asisten-musyrif/buat-assignment",
+        },
+      ];
+    }
+    
+    // Menu default untuk PEMBINA
+    return [
+      {
+        title: "Dashboard",
+        icon: "/dashboard.svg",
+        href: "/pembina/dashboard",
+      },
+      {
+        title: "Resident Per Lantai",
+        icon: "/res_perlantai.svg",
+        href: "/pembina/dashboard/resident",
+      },
+      {
+        title: "Nilai Tahfidz",
+        icon: "/tinjau_nilaiTahfidz.svg",
+        href: "/pembina/dashboard/tahfidz",
+      },
+      {
+        title: "Revisi Nilai",
+        icon: "/rev_nilaiTahfidz.svg",
+        href: "/pembina/dashboard/revisi",
+      },
+      {
+        title: "Buat Assignment",
+        icon: "/assigment.svg",
+        href: "/pembina/dashboard/assignment",
+      },
+    ];
+  };
+
+  const menuItems = getMenuItems();
 
   return (
     <aside
@@ -86,7 +119,7 @@ export default function Sidebar({ isOpen, toggleSidebar }: Props) {
         <div className="flex flex-col flex-1 mt-4">
           {/* User info */}
           <div className="flex items-center px-5 mb-4 mt-2">
-            <div className="bg-yellow-400 text-black w-11 h-11 flex items-center justify-center rounded-full font-bold text-lg">
+            <div className="bg-yellow-400 text-black w-11 h-11 flex items-center justify-center rounded-full font-bold text-lg flex-shrink-0">
               {userData ? getInitial(userData.name) : "M"}
             </div>
             <div className="ml-3 leading-tight">

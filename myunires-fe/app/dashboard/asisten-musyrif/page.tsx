@@ -1,151 +1,208 @@
 "use client";
 
-import React from "react";
-import Image from "next/image";
-import ScheduleTable, { ScheduleItem } from "./ScheduleTable";
-import { useRouter } from "next/navigation"; // ✅ pakai router untuk navigasi
+import { useAuth } from "@/lib/useAuth";
+import { getUser, clearAuth } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import Sidebar from "@/components/Sidebar";
+import LogoutModal from "@/components/LogoutModal";
 
-function QuickTile({
-  title,
-  onClick,
-  icon,
-}: {
-  title: string;
-  onClick?: () => void;
-  icon: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex h-32 w-full flex-col items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
-    >
-      <div className="mb-3 rounded-lg bg-emerald-50 p-3 ring-1 ring-emerald-100">
-        {icon}
-      </div>
-      <span className="text-sm font-semibold text-slate-900">{title}</span>
-    </button>
-  );
-}
+export default function DashboardPage() {
+  const [isOpen, setIsOpen] = useState(true);
+  const toggleSidebar = () => setIsOpen((prev) => !prev);
+  const router = useRouter();
+  const { user } = useAuth(["ASISTEN"]);
+  const [userData, setUserData] = useState<any>(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-export default function Page() {
-  const router = useRouter(); // ✅ inisialisasi router
+  useEffect(() => {
+    const currentUser = getUser();
+    if (currentUser) {
+      setUserData(currentUser);
+    }
+  }, []);
 
-  // nanti ganti dengan data user dari session/login kamu
-  const user = { name: "AsistenMusyrif", email: "asistenmusyrif@umy.ac.id" };
+  const handleLogout = () => {
+    clearAuth();
+    router.push("/login");
+  };
 
-  const schedule: ScheduleItem[] = [
-    { time: "04.00 – 04.30", activity: "Shalat Malam dan Sahur (Disunnahkan berpuasa senin & kamis atau Puasa Daud)", tone: "amber" },
-    { time: "04.30 – 05.00", activity: "Shalat subuh, doa dan kultum", tone: "sky" },
-    { time: "05.00 – 06.00", activity: "Materi dan kegiatan (terjadwal selama 4 kali)", tone: "emerald" },
-    { time: "06.00 – 06.45", activity: "Bersih-bersih dan persiapan ke kampus", tone: "sky" },
-    { time: "06.45 – 17.00", activity: "Berada di kampus", tone: "emerald" },
-    { time: "17.00 – 17.30", activity: "Persiapan Shalat maghrib", tone: "rose" },
-    { time: "17.30 – 18.00", activity: "Shalat Maghrib dan Kultum", tone: "rose" },
-    { time: "18.00 – 19.00", activity: "Tadarus al-Qur'an (setiap hari)", tone: "sky" },
-    { time: "19.00 – 19.30", activity: "Shalat Isya' dan Kultum", tone: "emerald" },
-    { time: "19.30 – 21.00", activity: "Materi dan kegiatan (terjadwal selama 3 kali)", tone: "amber" },
-    { time: "21.00 – 22.00", activity: "Belajar dan Mengerjakan Tugas", tone: "emerald" },
-    { time: "22.00 – 04.00", activity: "Tidur", tone: "sky" },
+  // Jadwal kegiatan harian (same as current ASISTEN)
+  const schedule = [
+    {
+      time: "04.00 – 04.30",
+      activity: "Shalat Malam dan Sahur (Disunnahkan berpuasa senin & kamis atau Puasa Daud)",
+    },
+    { time: "04.30 – 05.00", activity: "Shalat subuh, doa dan kultum" },
+    {
+      time: "05.00 – 06.00",
+      activity: "Materi dan kegiatan (terjadwal selama 4 kali)",
+    },
+    {
+      time: "06.00 – 06.45",
+      activity: "Bersih-bersih dan persiapan ke kampus",
+    },
+    { time: "06.45 – 17.00", activity: "Berada di kampus" },
+    { time: "17.00 – 17.30", activity: "Persiapan Shalat maghrib" },
+    { time: "17.30 – 18.00", activity: "Shalat Maghrib dan Kultum" },
+    { time: "18.00 – 19.00", activity: "Tadarus al-Qur'an (setiap hari)" },
+    { time: "19.00 – 19.30", activity: "Shalat Isya' dan Kultum" },
+    {
+      time: "19.30 – 21.00",
+      activity: "Materi dan kegiatan (terjadwal selama 3 kali)",
+    },
+    { time: "21.00 – 22.00", activity: "Belajar dan Mengerjakan Tugas" },
+    { time: "22.00 – 04.00", activity: "Tidur" },
+  ];
+
+  // Fungsi untuk menentukan warna tiap baris berdasarkan jam (same as PEMBINA)
+  const getRowColor = (time: string): string => {
+    if (time.startsWith("04:") || time.startsWith("05:")) return "bg-[#FCF5C7]";
+    if (
+      time.startsWith("06:") ||
+      time.startsWith("07:") ||
+      time.startsWith("08:")
+    )
+      return "bg-[#D6EADF]";
+    if (
+      time.startsWith("17:") ||
+      time.startsWith("18:") ||
+      time.startsWith("19:")
+    )
+      return "bg-[#FCE1E4]";
+    if (time.startsWith("21:") || time.startsWith("22:")) return "bg-[#DAEAF6]";
+    return "bg-white";
+  };
+
+  // Menu fitur ASISTEN (3 menu utama)
+  const features = [
+    {
+      title: "Resident Per Usroh",
+      icon: "/res_perlantai.svg", // reuse PEMBINA icon
+      href: "/dashboard/asisten-musyrif/resident-per-usroh",
+    },
+    {
+      title: "Input Nilai Tahfidz",
+      icon: "/tinjau_nilaiTahfidz.svg", // reuse PEMBINA icon
+      href: "/dashboard/asisten-musyrif/input-nilai-tahfidz",
+    },
+    {
+      title: "Buat Assignment",
+      icon: "/assigment.svg", // reuse PEMBINA icon
+      href: "/dashboard/asisten-musyrif/buat-assignment",
+    },
   ];
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* HEADER ATAS: logo kiri sejajar + tombol logout kanan, lalu subbar profil */}
-      <header>
-        {/* Bar atas putih: logo & tombol Log Out */}
-        <div className="bg-white">
-          <div className="mx-auto max-w-6xl px-4">
-            <div className="flex h-16 items-center justify-between">
-              {/* Kiri: logo UMY & UNIRES sejajar */}
-              <div className="flex items-center gap-8">
-                <Image src="/umy.png" alt="UMY" width={140} height={32} className="h-8 w-auto" priority />
-                <Image src="/unires.png" alt="UNIRES" width={120} height={28} className="h-7 w-auto" />
-              </div>
+    <div className="flex flex-col min-h-screen bg-white">
+      {/* ===== SIDEBAR ===== */}
+      {/* <Sidebar isOpen={isOpen} toggleSidebar={toggleSidebar} /> */}
 
-              {/* Kanan: tombol Log Out bulat */}
-              <button
-                onClick={() => alert("Log out")}
-                className="rounded-full bg-red-500 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400"
-              >
-                Log Out
-              </button>
+      {/* ===== MAIN CONTENT ===== */}
+      <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out`}>
+        {/* ===== HEADER ===== */}
+        <header className="flex justify-between items-center px-10 py-4 bg-white shadow">
+          <div className="flex items-center gap-4">
+            <img src="/lg_umy.svg" alt="UMY" className="h-8" />
+            <img src="/lg_unires.svg" alt="Unires" className="h-8" />
+          </div>
+          <button
+            onClick={() => setShowLogoutModal(true)}
+            className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-md transition"
+          >
+            Logout
+          </button>
+        </header>
+
+        {/* ===== LOGOUT MODAL ===== */}
+        <LogoutModal
+          open={showLogoutModal}
+          onCancel={() => setShowLogoutModal(false)}
+          onLogout={handleLogout}
+        />
+
+        {/* ===== SUBHEADER ===== */}
+        <div className="bg-[#004220] text-white py-3 px-3 relative">
+          <h1 className="absolute top-2 left-1/2 -translate-x-1/2 text-lg font-semibold mt-3">
+            Dashboard Asisten Musyrif
+          </h1>
+
+          <div className="flex items-center ml-7 mt-6 mb-2">
+            <div className="bg-yellow-400 text-[#000000] w-11 h-11 flex items-center justify-center rounded-full font-bold text-lg">
+              {userData
+                ? userData.name
+                  ? userData.name.charAt(0).toUpperCase()
+                  : "A"
+                : "A"}
+            </div>
+            <div className="ml-3 flex flex-col justify-center leading-tight">
+              <p className="font-medium text-white text-sm">
+                {userData ? userData.name : "Loading..."}
+              </p>
+              <p className="text-white text-xs">
+                {userData ? userData.email : ""}
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Subbar hijau muda: kartu profil di kiri */}
-        <div className="bg-emerald-50">
-          <div className="mx-auto max-w-6xl px-4 py-4">
-            <div className="flex items-center gap-3">
-              <div className="h-11 w-11 rounded-full bg-amber-400 text-emerald-900 font-bold grid place-items-center">
-                AM
-              </div>
-              <div className="leading-tight text-emerald-900">
-                <div className="text-sm font-semibold">{user.name}</div>
-                <div className="text-xs">{user.email}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* MAIN */}
-      <main className="mx-auto max-w-6xl px-4 py-10">
-        {/* Judul tengah besar */}
-        <h2 className="text-emerald-900 text-2xl md:text-3xl font-extrabold text-center">
+        {/* ===== JUDUL ===== */}
+        <h2 className="text-center text-[#0D6B44] text-2xl font-bold mb-3 mt-7">
           Kegiatan Harian di UNIRES
         </h2>
 
-        {/* Tabel jadwal */}
-        <div className="mx-auto mt-6 max-w-3xl rounded-2xl border border-slate-200 bg-white shadow-sm ring-1 ring-slate-100">
-          <ScheduleTable items={schedule} />
+        {/* ===== TABEL JADWAL ===== */}
+        <div className="flex justify-center mb-10">
+          <div className="rounded-xl overflow-hidden border border-[#004220] w-[650px]">
+            <table className="text-sm w-full border-collapse">
+              <thead className="bg-[#004220]/70 text-white">
+                <tr>
+                  <th className="py-2 px-4 w-1/3 border-b border-[#004220]">
+                    Waktu
+                  </th>
+                  <th className="py-2 px-4 border-b border-[#004220]">
+                    Kegiatan
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="text-center text-[#0D6B44]">
+                {schedule.map((item, i) => (
+                  <tr
+                    key={i}
+                    className={`${getRowColor(
+                      item.time
+                    )} border-b border-[#004220] last:border-b-0`}
+                  >
+                    <td className="py-2 px-4 border-r border-[#004220]">
+                      {item.time}
+                    </td>
+                    <td className="py-2 px-4">{item.activity}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        {/* Tiga tombol aksi */}
-        <div className="mx-auto mt-10 grid max-w-3xl grid-cols-1 gap-8 sm:grid-cols-3">
-          {/* Resident Per Usroh */}
-          <QuickTile
-            title="Resident Per Usroh"
-            onClick={() => router.push("/dashboard/asisten-musyrif/resident-per-usroh")}
-            icon={
-              <svg className="h-7 w-7 text-emerald-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-            }
-          />
-
-          {/* ✅ Input Nilai Tahfidz → navigate ke halaman input */}
-          <QuickTile
-            title="Input Nilai Tahfidz"
-            onClick={() => router.push("/dashboard/asisten-musyrif/input-nilai-tahfidz")}
-            icon={
-              <svg className="h-7 w-7 text-emerald-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="4" width="18" height="14" rx="2" />
-                <path d="M8 10h8M8 14h6M7 4v2M17 4v2" />
-              </svg>
-            }
-          />
-
-          {/* Buat Assignment (opsional, sementara alert atau arahkan ke rute lain jika sudah ada) */}
-          <QuickTile
-            title="Buat Assignment"
-            onClick={() => router.push("/dashboard/asisten-musyrif/buat-assignment")}
-            icon={
-              <svg className="h-7 w-7 text-emerald-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H7l-4-4V5a2 2 0 0 1 2-2h10" />
-                <path d="M17 3v4h4" />
-                <path d="M12 11h6M12 15h6M8 11h.01M8 15h.01" />
-              </svg>
-            }
-          />
+        {/* ===== BUTTON FITUR ===== */}
+        <div className="flex justify-center flex-wrap gap-8 mb-16">
+          {features.map((f) => (
+            <a
+              key={f.title}
+              href={f.href}
+              className="flex flex-col items-center text-center bg-[#D9D9D9] hover:bg-[#CFE8D7] transition rounded-md w-44 h-36 justify-center"
+            >
+              <img src={f.icon} alt={f.title} className="h-15 mb-3" />
+              <p className="text-[#0D6B44] text-sm font-semibold">{f.title}</p>
+            </a>
+          ))}
         </div>
-      </main>
+      </div>
 
-      {/* strip hijau bawah */}
-      <div className="h-6 bg-emerald-900" />
+      {/* ===== FOOTER ===== */}
+      <footer className="bg-[#004220] text-center text-white py-4 text-sm mt-auto">
+        © 2025 Universitas Muhammadiyah Yogyakarta - Asrama Unires
+      </footer>
     </div>
   );
 }

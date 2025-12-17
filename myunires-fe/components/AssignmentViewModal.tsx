@@ -10,6 +10,7 @@ interface AssignmentData {
   opsiC: string;
   opsiD: string;
   jawabanBenar: string;
+  soalImageUrl?: string | null;
   createdAt?: string;
   materi?: {
     id: number;
@@ -82,6 +83,14 @@ const AssignmentViewModal: React.FC<AssignmentViewModalProps> = ({
               {assignment.jawabanBenar}
             </span>
           </div>
+          {assignment.soalImageUrl && (
+            <div>
+              <span className="font-semibold text-[#004220]">Gambar Soal:</span>
+              <div className="mt-2">
+                <img src={assignment.soalImageUrl} alt="Soal" className="max-w-full h-auto rounded border" />
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex justify-end mt-8">
           <button

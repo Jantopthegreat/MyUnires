@@ -101,106 +101,108 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
-      {/* Header dan subheader tetap di sini, bisa dipindah ke komponen jika ingin lebih clean */}
-      <header className="flex justify-between items-center px-10 py-4 bg-white shadow">
-        <div className="flex items-center gap-4">
-          <img src="/lg_umy.svg" alt="UMY" className="h-8" />
-          <img src="/lg_unires.svg" alt="Unires" className="h-8" />
-        </div>
-        <button
-          onClick={() => setShowLogoutModal(true)}
-          className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-md transition"
-        >
-          Logout
-        </button>
-      </header>
-
-      {/* Logout Modal */}
-      <LogoutModal
-        open={showLogoutModal}
-        onCancel={() => setShowLogoutModal(false)}
-        onLogout={handleLogout}
-      />
-
-      {/* SUBHEADER */}
-      <div className="bg-[#004220] text-white py-3 px-3 relative">
-        <h1 className="absolute top-2 left-1/2 -translate-x-1/2 text-lg font-semibold mt-3">
-          Dashboard Musyrif
-        </h1>
-
-        <div className="flex items-center ml-7 mt-6 mb-2">
-          <div className="bg-yellow-400 text-[#000000] w-11 h-11 flex items-center justify-center rounded-full font-bold text-lg">
-            {userData
-              ? userData.name
-                ? userData.name.charAt(0).toUpperCase()
-                : "M"
-              : "M"}
+      {/* ...existing code... */}
+      <div className="flex-1 flex flex-col">
+        {/* Header dan subheader tetap di sini, bisa dipindah ke komponen jika ingin lebih clean */}
+        <header className="flex justify-between items-center px-10 py-4 bg-white shadow">
+          <div className="flex items-center gap-4">
+            <img src="/lg_umy.svg" alt="UMY" className="h-8" />
+            <img src="/lg_unires.svg" alt="Unires" className="h-8" />
           </div>
-          <div className="ml-3 flex flex-col justify-center leading-tight">
-            <p className="font-medium text-white text-sm">
-              {userData ? userData.name : "Loading..."}
-            </p>
-            <p className="text-white text-xs">
-              {userData ? userData.email : ""}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* JUDUL */}
-      <h2 className="text-center text-[#0D6B44] text-2xl font-bold mb-3 mt-7">
-        Kegiatan Harian di UNIIRES
-      </h2>
-
-      {/* TABEL JADWAL */}
-      <div className="flex justify-center mb-10">
-        <div className="rounded-xl overflow-hidden border border-[#004220] w-[650px]">
-          <table className="text-sm w-full border-collapse">
-            <thead className="bg-[#004220]/70 text-white">
-              <tr>
-                <th className="py-2 px-4 w-1/3 border-b border-[#004220]">
-                  Waktu
-                </th>
-                <th className="py-2 px-4 border-b border-[#004220]">
-                  Kegiatan
-                </th>
-              </tr>
-            </thead>
-            <tbody className="text-center text-[#0D6B44]">
-              {schedule.map((item, i) => (
-                <tr
-                  key={i}
-                  className={`${getRowColor(
-                    item.time
-                  )} border-b border-[#004220] last:border-b-0`}
-                >
-                  <td className="py-2 px-4 border-r border-[#004220]">
-                    {item.time}
-                  </td>
-                  <td className="py-2 px-4">{item.activity}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* === BUTTON FITUR === */}
-      <div className="flex justify-center flex-wrap gap-8 mb-16">
-        {features.map((f) => (
-          <a
-            key={f.title}
-            href={f.href}
-            className="flex flex-col items-center text-center bg-[#D9D9D9] hover:bg-[#CFE8D7] transition  rounded-md w-44 h-36 justify-center "
+          <button
+            onClick={() => setShowLogoutModal(true)}
+            className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-md transition"
           >
-            <img src={f.icon} alt={f.title} className="h-15 mb-3" />
-            <p className="text-[#0D6B44] font-semibold text-sm">{f.title}</p>
-          </a>
-        ))}
-      </div>
+            Logout
+          </button>
+        </header>
 
+        {/* Logout Modal */}
+        <LogoutModal
+          open={showLogoutModal}
+          onCancel={() => setShowLogoutModal(false)}
+          onLogout={handleLogout}
+        />
+
+        {/* SUBHEADER */}
+        <div className="bg-[#004220] text-white py-3 px-3 relative">
+          <h1 className="absolute top-2 left-1/2 -translate-x-1/2 text-lg font-semibold mt-3">
+            Dashboard Musyrif
+          </h1>
+
+          <div className="flex items-center ml-7 mt-6 mb-2">
+            <div className="bg-yellow-400 text-[#000000] w-11 h-11 flex items-center justify-center rounded-full font-bold text-lg">
+              {userData
+                ? userData.name
+                  ? userData.name.charAt(0).toUpperCase()
+                  : "M"
+                : "M"}
+            </div>
+            <div className="ml-3 flex flex-col justify-center leading-tight">
+              <p className="font-medium text-white text-sm">
+                {userData ? userData.name : "Loading..."}
+              </p>
+              <p className="text-white text-xs">
+                {userData ? userData.email : ""}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* JUDUL */}
+        <h2 className="text-center text-[#0D6B44] text-2xl font-bold mb-3 mt-7">
+          Kegiatan Harian di UNIIRES
+        </h2>
+
+        {/* TABEL JADWAL */}
+        <div className="flex justify-center mb-10">
+          <div className="rounded-xl overflow-hidden border border-[#004220] w-[650px]">
+            <table className="text-sm w-full border-collapse">
+              <thead className="bg-[#004220]/70 text-white">
+                <tr>
+                  <th className="py-2 px-4 w-1/3 border-b border-[#004220]">
+                    Waktu
+                  </th>
+                  <th className="py-2 px-4 border-b border-[#004220]">
+                    Kegiatan
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="text-center text-[#0D6B44]">
+                {schedule.map((item, i) => (
+                  <tr
+                    key={i}
+                    className={`${getRowColor(
+                      item.time
+                    )} border-b border-[#004220] last:border-b-0`}
+                  >
+                    <td className="py-2 px-4 border-r border-[#004220]">
+                      {item.time}
+                    </td>
+                    <td className="py-2 px-4">{item.activity}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* === BUTTON FITUR === */}
+        <div className="flex justify-center flex-wrap gap-8 mb-16">
+          {features.map((f) => (
+            <a
+              key={f.title}
+              href={f.href}
+              className="flex flex-col items-center text-center bg-[#D9D9D9] hover:bg-[#CFE8D7] transition  rounded-md w-44 h-36 justify-center "
+            >
+              <img src={f.icon} alt={f.title} className="h-15 mb-3" />
+              <p className="text-[#0D6B44] font-semibold text-sm">{f.title}</p>
+            </a>
+          ))}
+        </div>
+      </div>
       {/* FOOTER */}
-      <footer className="bg-[#004220] text-center text-white py-4 text-sm">
+      <footer className="bg-[#004220] text-center text-white py-4 text-sm mt-auto">
         © 2025 Universitas Muhammadiyah Yogyakarta - Asrama Unires
       </footer>
     </div>

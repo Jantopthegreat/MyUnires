@@ -17,6 +17,7 @@ interface AssignmentData {
   opsiD: string;
   jawabanBenar: string;
   createdAt?: string;
+  soalImageUrl?: string | null;
   materi?: {
     id: number;
     judul: string;
@@ -47,6 +48,7 @@ interface FormData {
   opsiC: string;
   opsiD: string;
   jawabanBenar: string;
+  soalImageUrl?: string | null;
 }
 
 export default function AssignmentPage() {
@@ -61,6 +63,8 @@ export default function AssignmentPage() {
   >([]);
   const [kategoriList, setKategoriList] = useState<KategoriOption[]>([]);
   const [materiList, setMateriList] = useState<MateriOption[]>([]);
+  // Untuk filter bar
+  const [filteredMateriListFilterBar, setFilteredMateriListFilterBar] = useState<MateriOption[]>([]);
   const [filteredMateriList, setFilteredMateriList] = useState<MateriOption[]>(
     []
   );
@@ -92,10 +96,13 @@ export default function AssignmentPage() {
     opsiC: "",
     opsiD: "",
     jawabanBenar: "A",
+    soalImageUrl: undefined,
   });
 
   // State untuk form kategori selection
   const [selectedKategoriForm, setSelectedKategoriForm] = useState("");
+  const [soalImageFile, setSoalImageFile] = useState<File | null>(null);
+  const [soalImagePreview, setSoalImagePreview] = useState<string | null>(null);
 
   // State untuk soal dinamis (untuk UI multiple questions)
   const [questions, setQuestions] = useState(["", "", ""]);
@@ -110,25 +117,22 @@ export default function AssignmentPage() {
   // Filter materi berdasarkan kategori yang dipilih di form
   useEffect(() => {
     if (selectedKategoriForm) {
-      const filtered = materiList.filter(
-        (m) => m.kategoriId === Number(selectedKategoriForm)
-      );
+      const filtered = materiList.filter((m) => m.kategoriId === Number(selectedKategoriForm));
       setFilteredMateriList(filtered);
-      setFormData({ ...formData, materiId: "" }); // Reset materi saat kategori berubah
     } else {
-      setFilteredMateriList([]);
+      setFilteredMateriList(materiList);
     }
   }, [selectedKategoriForm, materiList]);
 
   // Filter materi di filter bar berdasarkan kategori
   useEffect(() => {
-    if (selectedKategoriFilter && selectedKategoriFilter !== "all") {
+    if (selectedKategoriFilter && selectedKategoriFilter !== "all" && selectedKategoriFilter !== "Kategori (All)") {
       const filtered = materiList.filter(
         (m) => m.kategoriId === Number(selectedKategoriFilter)
       );
-      setFilteredMateriList(filtered);
+      setFilteredMateriListFilterBar(filtered);
     } else {
-      setFilteredMateriList(materiList);
+      setFilteredMateriListFilterBar(materiList);
     }
   }, [selectedKategoriFilter, materiList]);
 
@@ -170,7 +174,6 @@ export default function AssignmentPage() {
   const fetchAssignments = async () => {
     try {
       const token = localStorage.getItem("token");
-      console.log("🔑 Token:", token ? "Ada" : "Tidak ada");
 
       const response = await fetch(
         "http://localhost:3001/api/musyrif/assignments",
@@ -179,19 +182,16 @@ export default function AssignmentPage() {
         }
       );
 
-      console.log("📡 Response status:", response.status);
 
       if (response.ok) {
         const result = await response.json();
-        console.log("📦 Raw result:", result);
         const data = result.data || result;
-        console.log("✅ Assignments data:", data);
         setAssignments(Array.isArray(data) ? data : []);
       } else {
-        console.error("❌ Response not OK:", response.status);
+        console.error("Response not OK:", response.status);
       }
     } catch (error) {
-      console.error("❌ Error fetching assignments:", error);
+      console.error("Error fetching assignments:", error);
     }
   };
 
@@ -230,7 +230,11 @@ export default function AssignmentPage() {
       if (response.ok) {
         const result = await response.json();
         const data = result.data || result;
-        setMateriList(Array.isArray(data) ? data : []);
+        // Pastikan kategoriId number
+        const materiWithNumberKategoriId = Array.isArray(data)
+          ? data.map((m) => ({ ...m, kategoriId: Number(m.kategoriId) }))
+          : [];
+        setMateriList(materiWithNumberKategoriId);
       }
     } catch (error) {
       console.error("Error fetching materi:", error);
@@ -252,6 +256,20 @@ export default function AssignmentPage() {
     setShowViewModal(true);
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) {
+      setSoalImageFile(file);
+      setSoalImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const removeImageSelection = () => {
+    setSoalImageFile(null);
+    setSoalImagePreview(null);
+    setFormData((prev) => ({ ...prev, soalImageUrl: undefined }));
+  };
+
   const handleEdit = (assignment: AssignmentData) => {
     setSelectedAssignment(assignment);
     setFormData({
@@ -267,6 +285,9 @@ export default function AssignmentPage() {
     if (assignment.materi) {
       setSelectedKategoriForm(String(assignment.materi.kategori.id));
     }
+    setSoalImageFile(null);
+    setSoalImagePreview(assignment.soalImageUrl || null);
+    setFormData((prev) => ({ ...prev, soalImageUrl: assignment.soalImageUrl || undefined }));
     setShowEditModal(true);
   };
 
@@ -328,8 +349,33 @@ export default function AssignmentPage() {
       return;
     }
 
+    let uploadedImageUrl: string | undefined = undefined;
     try {
       const token = localStorage.getItem("token");
+      if (soalImageFile) {
+        const fd = new FormData();
+        fd.append('file', soalImageFile);
+        const uploadResp = await fetch('http://localhost:3001/api/musyrif/assignments/upload', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
+        });
+        if (uploadResp.ok) {
+          const uploadJson = await uploadResp.json();
+          uploadedImageUrl = uploadJson.url; // e.g., /uploads/assignments/abc.jpg
+        } else {
+          console.error('Upload failed:', uploadResp.status);
+          throw new Error('Gagal mengupload gambar');
+        }
+      }
+
+      const payload = {
+        ...formData,
+        materiId: Number(formData.materiId),
+        ...(uploadedImageUrl && { soalImageUrl: uploadedImageUrl }),
+      };
+      console.log("📝 Creating assignment - payload:", payload);
+
       const response = await fetch(
         "http://localhost:3001/api/musyrif/assignments",
         {
@@ -338,10 +384,7 @@ export default function AssignmentPage() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            ...formData,
-            materiId: Number(formData.materiId),
-          }),
+          body: JSON.stringify(payload),
         }
       );
 
@@ -358,16 +401,72 @@ export default function AssignmentPage() {
         setShowAddModal(false);
         resetForm();
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to save");
+        let errorData: any = null;
+        try {
+          errorData = await response.json();
+        } catch (parseErr) {
+          console.error("Failed to parse error response JSON", parseErr);
+        }
+        console.error("Create assignment failed:", response.status, response.statusText, errorData);
+        throw new Error(errorData?.message || `Failed to save (status ${response.status})`);
       }
     } catch (error: any) {
       console.error("Error saving assignment:", error);
-      Swal.fire(
-        "Error",
-        error.message || "Gagal menyimpan assignment",
-        "error"
-      );
+
+      // If we uploaded an image, prompt user to retry without the image
+      if (uploadedImageUrl) {
+        const result = await Swal.fire({
+          icon: "error",
+          title: "Gagal menyimpan dengan gambar",
+          text: "Server mengembalikan error saat menyimpan assignment yang berisi gambar. Coba simpan tanpa gambar?",
+          showCancelButton: true,
+          confirmButtonText: "Simpan tanpa gambar",
+          cancelButtonText: "Batal",
+        });
+
+        if (result.isConfirmed) {
+          try {
+            const token = localStorage.getItem("token");
+            const retryPayload = {
+              ...formData,
+              materiId: Number(formData.materiId),
+            };
+            console.log("📝 Retrying create without image - payload:", retryPayload);
+            const retryResp = await fetch("http://localhost:3001/api/musyrif/assignments", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify(retryPayload),
+            });
+
+            if (retryResp.ok) {
+              Swal.fire({ icon: "success", title: "Assignment berhasil ditambahkan tanpa gambar", timer: 2000 });
+              fetchAssignments();
+              setShowAddModal(false);
+              resetForm();
+              return;
+            } else {
+              let retryErr: any = null;
+              try {
+                retryErr = await retryResp.json();
+              } catch (e) {
+                console.error("Failed to parse retry error JSON", e);
+              }
+              console.error("Retry without image failed:", retryResp.status, retryResp.statusText, retryErr);
+              Swal.fire("Error", retryErr?.message || `Gagal menyimpan (status ${retryResp.status})`, "error");
+              return;
+            }
+          } catch (retryError: any) {
+            console.error("Retry without image error:", retryError);
+            Swal.fire("Error", retryError.message || "Gagal menyimpan assignment", "error");
+            return;
+          }
+        }
+      }
+
+      Swal.fire("Error", error.message || "Gagal menyimpan assignment", "error");
     }
   };
 
@@ -394,6 +493,31 @@ export default function AssignmentPage() {
 
     try {
       const token = localStorage.getItem("token");
+      let uploadedImageUrl: string | undefined = undefined;
+      if (soalImageFile) {
+        const fd = new FormData();
+        fd.append('file', soalImageFile);
+        const uploadResp = await fetch('http://localhost:3001/api/musyrif/assignments/upload', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
+        });
+        if (uploadResp.ok) {
+          const uploadJson = await uploadResp.json();
+          uploadedImageUrl = uploadJson.url;
+        } else {
+          console.error('Upload failed:', uploadResp.status);
+          throw new Error('Gagal mengupload gambar');
+        }
+      }
+      const payload = {
+        ...formData,
+        materiId: Number(formData.materiId),
+        ...(soalImagePreview === null && formData.soalImageUrl === undefined ? { soalImageUrl: null } : {}),
+        ...(uploadedImageUrl ? { soalImageUrl: uploadedImageUrl } : {}),
+      };
+      console.log("📝 Updating assignment - payload:", payload);
+
       const response = await fetch(
         `http://localhost:3001/api/musyrif/assignments/${selectedAssignment.id}`,
         {
@@ -402,10 +526,7 @@ export default function AssignmentPage() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            ...formData,
-            materiId: Number(formData.materiId),
-          }),
+          body: JSON.stringify(payload),
         }
       );
 
@@ -423,8 +544,14 @@ export default function AssignmentPage() {
         setSelectedAssignment(null);
         resetForm();
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to update");
+        let errorData: any = null;
+        try {
+          errorData = await response.json();
+        } catch (parseErr) {
+          console.error("Failed to parse error response JSON", parseErr);
+        }
+        console.error("Update assignment failed:", response.status, response.statusText, errorData);
+        throw new Error(errorData?.message || `Failed to update (status ${response.status})`);
       }
     } catch (error: any) {
       console.error("Error updating assignment:", error);
@@ -449,6 +576,8 @@ export default function AssignmentPage() {
     });
     setSelectedKategoriForm("");
     setQuestions(["", "", ""]);
+    setSoalImageFile(null);
+    setSoalImagePreview(null);
   };
 
   return (
@@ -550,7 +679,7 @@ export default function AssignmentPage() {
               iconSrc="/filter_icon.svg"
               options={[
                 "Materi (All)",
-                ...filteredMateriList.map((m) => m.judul),
+                ...filteredMateriListFilterBar.map((m) => m.judul),
               ]}
               value={selectedMateriFilter}
               onChange={setSelectedMateriFilter}
@@ -573,66 +702,72 @@ export default function AssignmentPage() {
         </section>
 
         {/* ===== TABLE ===== */}
-        <section className="px-6">
-          <div className="bg-white rounded-lg shadow overflow-hidden border border-[#004220]">
-            <table className="w-full text-sm border-collapse">
-              <thead className="text-[#004220] border-b border-[#004220]">
-                <tr>
-                  <th className="py-3 text-left px-4">No</th>
-                  <th className="py-3 text-left px-4">Kategori</th>
-                  <th className="py-3 text-left px-4">Materi</th>
-                  <th className="py-3 text-center px-4">Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredAssignments.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="py-8 text-center text-gray-500">
-                      {searchQuery
-                        ? "Tidak ada assignment yang ditemukan"
-                        : "Belum ada data assignment"}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredAssignments.map((assignment, i) => (
-                    <tr
-                      key={assignment.id}
-                      className="text-[#004220] border-b border-[#004220] hover:bg-[#F7F9F8] transition"
-                    >
-                      <td className="py-3 px-4">{i + 1}</td>
-                      <td className="py-3 px-4">
-                        {assignment.materi?.kategori?.nama || "-"}
-                      </td>
-                      <td className="py-3 px-4">
-                        {assignment.materi?.judul || "-"}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <div className="flex items-center justify-center gap-3">
-                          <img
-                            src="/eye_icon.svg"
-                            alt="view"
-                            className="h-5 w-5 cursor-pointer hover:opacity-70"
-                            onClick={() => handleView(assignment)}
-                          />
-                          <img
-                            src="/edit.svg"
-                            alt="edit"
-                            className="h-5 w-5 cursor-pointer hover:opacity-70"
-                            onClick={() => handleEdit(assignment)}
-                          />
-                          <img
-                            src="/delete.svg"
-                            alt="delete"
-                            className="h-5 w-5 cursor-pointer hover:opacity-70"
-                            onClick={() => handleDelete(assignment)}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+        <section className="px-6 pb-6">
+          <div className="bg-white rounded-lg shadow border border-[#004220] overflow-hidden">
+            {filteredAssignments.length === 0 ? (
+              <div className="text-center py-10 text-gray-500">
+                {searchQuery
+                  ? "Tidak ada assignment yang ditemukan"
+                  : "Belum ada data assignment"}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <div className="max-h-[600px] overflow-y-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead className="text-[#004220] border-b border-[#004220] bg-white sticky top-0 z-10">
+                      <tr>
+                        <th className="py-3 text-left px-4 bg-white">No</th>
+                        <th className="py-3 text-left px-4 bg-white">Kategori</th>
+                        <th className="py-3 text-left px-4 bg-white">Materi</th>
+                        <th className="py-3 text-center px-4 bg-white">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredAssignments.map((assignment, i) => (
+                        <tr
+                          key={assignment.id}
+                          className="text-[#004220] border-b border-[#004220] hover:bg-[#F7F9F8] transition"
+                        >
+                          <td className="py-3 px-4">{i + 1}</td>
+                          <td className="py-3 px-4">
+                            {assignment.materi?.kategori?.nama || "-"}
+                          </td>
+                          <td className="py-3 px-4">
+                            {assignment.materi?.judul || "-"}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex items-center justify-center gap-3">
+                              <img
+                                src="/eye_icon.svg"
+                                alt="view"
+                                className="h-5 w-5 cursor-pointer hover:opacity-70"
+                                onClick={() => handleView(assignment)}
+                              />
+                              <img
+                                src="/edit.svg"
+                                alt="edit"
+                                className="h-5 w-5 cursor-pointer hover:opacity-70"
+                                onClick={() => handleEdit(assignment)}
+                              />
+                              <img
+                                src="/delete.svg"
+                                alt="delete"
+                                className="h-5 w-5 cursor-pointer hover:opacity-70"
+                                onClick={() => handleDelete(assignment)}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+          {/* Info jumlah data */}
+          <div className="mt-3 text-sm text-gray-600">
+            Menampilkan {filteredAssignments.length} dari {assignments.length} assignment
           </div>
         </section>
       </main>
@@ -714,6 +849,16 @@ export default function AssignmentPage() {
                     {selectedAssignment.pertanyaan}
                   </p>
                 </div>
+
+                {/* Gambar Soal */}
+                {selectedAssignment.soalImageUrl && (
+                  <div className="mt-3 border border-gray-200 rounded-md p-3 bg-gray-50">
+                    <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1 block">
+                      Gambar Soal
+                    </label>
+                    <img src={selectedAssignment.soalImageUrl} alt="Gambar Soal" className="max-w-full max-h-60 rounded" />
+                  </div>
+                )}
 
                 {/* Pilihan Jawaban */}
                 <div>
@@ -800,7 +945,9 @@ export default function AssignmentPage() {
                 </label>
                 <select
                   value={selectedKategoriForm}
-                  onChange={(e) => setSelectedKategoriForm(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedKategoriForm(e.target.value);
+                  }}
                   className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#4A6FA5]"
                 >
                   <option value="">Pilih Kategori</option>
@@ -819,22 +966,28 @@ export default function AssignmentPage() {
                 </label>
                 <select
                   value={formData.materiId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, materiId: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setFormData({ ...formData, materiId: e.target.value });
+                  }}
                   className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#4A6FA5]"
-                  disabled={!selectedKategoriForm}
                 >
                   <option value="">Pilih Materi</option>
-                  {filteredMateriList.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.judul}
+                  {filteredMateriList.length === 0 ? (
+                    <option value="" disabled>
+                      Tidak ada materi untuk kategori ini
                     </option>
-                  ))}
+                  ) : (
+                    filteredMateriList.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.judul}
+                      </option>
+                    ))
+                  )}
                 </select>
-                {!selectedKategoriForm && (
+                {/* Info jika kategori belum dipilih */}
+                {selectedKategoriForm === "" && (
                   <p className="text-xs text-gray-500 mt-1">
-                    Pilih kategori terlebih dahulu
+                    Pilih kategori untuk filter materi (opsional)
                   </p>
                 )}
               </div>
@@ -869,6 +1022,27 @@ export default function AssignmentPage() {
                   rows={3}
                   className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#4A6FA5]"
                 />
+              </div>
+
+              {/* Upload Gambar Soal */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Gambar Soal (opsional)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="mt-1 w-full text-sm"
+                />
+                {soalImagePreview && (
+                  <div className="mt-2">
+                    <img src={soalImagePreview} alt="Preview" className="max-h-40 rounded" />
+                    <div className="mt-1">
+                      <button onClick={removeImageSelection} className="text-red-600 text-sm">Hapus Gambar</button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Opsi A-D */}
@@ -1113,6 +1287,25 @@ export default function AssignmentPage() {
                     rows={3}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#004220] focus:border-[#004220] transition resize-none"
                   />
+                </div>
+
+                {/* Upload Gambar Soal (Edit) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Gambar Soal (opsional)</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="w-full border rounded-md px-3 py-2 text-sm"
+                  />
+                  {soalImagePreview && (
+                    <div className="mt-2">
+                      <img src={soalImagePreview} alt="Preview" className="max-h-40 rounded" />
+                      <div className="mt-1">
+                        <button onClick={removeImageSelection} className="text-red-600 text-sm">Hapus Gambar</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Pilihan Jawaban */}

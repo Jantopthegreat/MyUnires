@@ -1,7 +1,93 @@
 import { prisma } from "../config/prisma.js";
+import { generateActivationToken, hashToken } from "../utils/token.js";
+import { sendActivationEmail } from "../services/emailService.js";
 import bcrypt from "bcrypt";
 import XLSX from "xlsx";
 import fs from "fs";
+
+
+export const getTahfidzProgressByTarget = async (req, res) => {
+  try {
+    const DONE_STATUS = "SELESAI";
+
+    const [residentCount, targets] = await Promise.all([
+      prisma.resident.count(),
+      prisma.targetHafalan.findMany({
+        select: { id: true, nama: true, surah: true, ayatMulai: true, ayatAkhir: true },
+        orderBy: { id: "asc" },
+      }),
+    ]);
+
+    // Ambil semua pasangan (targetHafalanId, residentId) yang SELESAI
+    // distinct supaya kalau ada duplikat tidak dobel hitung
+    const selesaiPairs = await prisma.nilaiTahfidz.findMany({
+      where: { status: DONE_STATUS },
+      select: { targetHafalanId: true, residentId: true },
+      distinct: ["targetHafalanId", "residentId"],
+    });
+
+    // hitung selesai per target
+    const selesaiCountByTarget = new Map(); // targetId -> count
+    for (const row of selesaiPairs) {
+      selesaiCountByTarget.set(
+        row.targetHafalanId,
+        (selesaiCountByTarget.get(row.targetHafalanId) || 0) + 1
+      );
+    }
+
+    const rows = targets.map((t) => {
+      const selesai = selesaiCountByTarget.get(t.id) || 0;
+      const belum = Math.max(0, residentCount - selesai);
+
+      return {
+        targetId: t.id,
+        nama: t.nama,
+        surah: t.surah,
+        ayatMulai: t.ayatMulai,
+        ayatAkhir: t.ayatAkhir,
+        selesai,
+        belum,
+        totalResident: residentCount,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Progress tahfidz per target berhasil diambil.",
+      data: rows,
+    });
+  } catch (error) {
+    console.error("Error getTahfidzProgressByTarget:", error);
+    return res.status(500).json({ message: "Terjadi kesalahan server." });
+  }
+};
+
+
+
+// ✅ Dashboard summary (counts)
+export const getAdminSummary = async (req, res) => {
+  try {
+    const [residentCount, musyrifCount, asistenCount] = await Promise.all([
+      prisma.resident.count(),
+      prisma.musyrif.count(),
+      prisma.asistenMusyrif.count(),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Ringkasan dashboard berhasil diambil.",
+      data: {
+        residentCount,
+        musyrifCount,
+        asistenCount,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error("Error getAdminSummary:", error);
+    return res.status(500).json({ message: "Terjadi kesalahan server." });
+  }
+};
 
 /* ==========================================================
    ✅ CRUD DATA RESIDENT (oleh Admin)
@@ -83,29 +169,29 @@ export const getResidentById = async (req, res) => {
  */
 export const createResident = async (req, res) => {
   try {
-    const { name, email, password, nim, jurusan, angkatan, noTelp, usrohId, lantaiId } = req.body;
+    const { name, email, nim, jurusan, angkatan, noTelp, usrohId, lantaiId } = req.body;
 
-    if (!name || !email || !password || !nim || !jurusan || !angkatan) {
-      return res.status(400).json({ message: "Semua data wajib diisi." });
+    if (!name || !email || !nim || !jurusan || !angkatan) {
+      return res.status(400).json({ message: "Semua data wajib diisi (tanpa password)." });
     }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) return res.status(400).json({ message: "Email sudah terdaftar." });
+
     const existingNIM = await prisma.resident.findFirst({ where: { nim } });
-    if (existingNIM) {
-      return res.status(400).json({ message: "NIM sudah terdaftar." });
-    }
+    if (existingNIM) return res.status(400).json({ message: "NIM sudah terdaftar." });
 
-
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const activationToken = generateActivationToken();
+    const activationTokenHash = hashToken(activationToken);
 
     const result = await prisma.$transaction(async (tx) => {
       const newUser = await tx.user.create({
         data: {
           name,
           email,
-          password: hashedPassword,
+          password: null,
           role: "RESIDENT",
+          isActive: false,
         },
       });
 
@@ -116,24 +202,51 @@ export const createResident = async (req, res) => {
           jurusan,
           angkatan: Number(angkatan),
           noTelp: noTelp || null,
-          usrohId: usrohId || null,
-          lantaiId: lantaiId || null,
+          usrohId: usrohId ? Number(usrohId) : null,
+          lantaiId: lantaiId ? Number(lantaiId) : null,
+        },
+      });
+
+      await tx.accountActivationToken.create({
+        data: {
+          userId: newUser.id,
+          tokenHash: activationTokenHash,
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
         },
       });
 
       return { newUser, newResident };
     });
 
-    res.status(201).json({
+    // Kirim email (di luar transaksi)
+    const feUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const activationLink = `${feUrl}/activate?token=${activationToken}`;
+
+    try {
+      await sendActivationEmail(email, activationLink);
+    } catch (mailErr) {
+      console.error("❌ Email activation gagal:", mailErr);
+      // akun tetap dibuat; user bisa pakai fitur resend activation nanti
+      return res.status(201).json({
+        success: true,
+        message:
+          "Resident berhasil ditambahkan, tapi email aktivasi gagal dikirim. Silakan coba kirim ulang aktivasi.",
+        data: result,
+      });
+    }
+
+    return res.status(201).json({
       success: true,
-      message: "Resident berhasil ditambahkan.",
+      message: "Resident berhasil ditambahkan. Link aktivasi sudah dikirim ke email.",
       data: result,
     });
   } catch (error) {
     console.error("❌ Error createResident:", error);
-    res.status(500).json({ message: "Terjadi kesalahan server." });
+    return res.status(500).json({ message: "Terjadi kesalahan server." });
   }
 };
+
+
 
 /**
  * Update data Resident
@@ -270,7 +383,7 @@ export const deleteResident = async (req, res) => {
 /**
  * Import Resident dari Excel
  */
-export const importResident = async (req, res) => {
+  export const importResident = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "File Excel tidak ditemukan." });
 
@@ -284,52 +397,94 @@ export const importResident = async (req, res) => {
     }
 
     const created = [];
+    const skipped = [];
+
+    const feUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
     for (const row of rows) {
-      const { name, email, password, nim, jurusan, angkatan, noTelp, usrohId, lantaiId } = row;
-      if (!name || !email || !password || !nim || !jurusan || !angkatan) continue;
+      const { name, email, nim, jurusan, angkatan, noTelp, usrohId, lantaiId } = row;
 
-      const existing = await prisma.user.findUnique({ where: { email } });
-      if (existing) continue;
+      if (!name || !email || !nim || !jurusan || !angkatan) {
+        skipped.push({ email, reason: "Kolom wajib kurang" });
+        continue;
+      }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const emailStr = String(email);
+      const nimStr = String(nim);
 
-      const user = await prisma.user.create({
-        data: { name, email, password: hashedPassword, role: "RESIDENT" },
+      const existing = await prisma.user.findUnique({ where: { email: emailStr } });
+      if (existing) {
+        skipped.push({ email: emailStr, reason: "Email sudah ada" });
+        continue;
+      }
+
+      const existingNIM = await prisma.resident.findFirst({ where: { nim: nimStr } });
+      if (existingNIM) {
+        skipped.push({ email: emailStr, reason: "NIM sudah ada" });
+        continue;
+      }
+
+      const activationToken = generateActivationToken();
+      const activationTokenHash = hashToken(activationToken);
+
+      // create user+resident+token
+      await prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            name: String(name),
+            email: emailStr,
+            password: null,
+            role: "RESIDENT",
+            isActive: false,
+          },
+        });
+
+        await tx.resident.create({
+          data: {
+            userId: user.id,
+            nim: nimStr,
+            jurusan: String(jurusan),
+            angkatan: Number(angkatan),
+            noTelp: noTelp ? String(noTelp) : null,
+            usrohId: usrohId ? Number(usrohId) : null,
+            lantaiId: lantaiId ? Number(lantaiId) : null,
+          },
+        });
+
+        await tx.accountActivationToken.create({
+          data: {
+            userId: user.id,
+            tokenHash: activationTokenHash,
+            expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+          },
+        });
       });
 
-      await prisma.resident.create({
-        data: {
-          userId: user.id,
-          nim,
-          jurusan,
-          angkatan: Number(angkatan),
-          noTelp: noTelp || null,
-          usrohId: usrohId || null,
-          lantaiId: lantaiId || null,
-        },
-      });
-
-      created.push({ name, email });
+      // kirim email per user
+      const activationLink = `${feUrl}/activate?token=${activationToken}`;
+      try {
+        await sendActivationEmail(emailStr, activationLink);
+        created.push({ name: String(name), email: emailStr });
+      } catch (mailErr) {
+        console.error(`❌ Email activation gagal (${emailStr}):`, mailErr);
+        skipped.push({ email: emailStr, reason: "Gagal kirim email aktivasi" });
+      }
     }
 
     fs.unlinkSync(req.file.path);
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: `Berhasil mengimpor ${created.length} data resident.`,
       data: created,
+      skipped,
     });
   } catch (error) {
     console.error("❌ Error importResident:", error);
-    res.status(500).json({ message: "Terjadi kesalahan saat import Excel." });
+    return res.status(500).json({ message: "Terjadi kesalahan saat import Excel." });
   }
 };
 
-
-/* ==========================================================
-   ✅ CRUD DATA ASISTEN MUSYRIF (oleh Admin)
-   ========================================================== */
 
 /**
  * Ambil semua Asisten Musyrif (include user dan usroh)
@@ -338,31 +493,31 @@ export const getAllAsistenMusyrif = async (req, res) => {
   try {
     const asisten = await prisma.asistenMusyrif.findMany({
       include: {
-        user: { select: { id: true, name: true, email: true } },
+        user: { select: { id: true, name: true, email: true, isActive: true } },
         usroh: { select: { id: true, nama: true } },
       },
       orderBy: { id: "asc" },
     });
 
-    if (!asisten.length)
-      return res.status(404).json({ message: "Belum ada data asisten musyrif." });
+    if (!asisten.length) return res.status(404).json({ message: "Belum ada data asisten musyrif." });
 
     const formatted = asisten.map((a) => ({
       id: a.id,
       name: a.user.name,
       email: a.user.email,
+      isActive: a.user.isActive,
       usroh: a.usroh ? a.usroh.nama : "-",
       createdAt: a.createdAt,
     }));
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Data asisten musyrif berhasil diambil.",
       data: formatted,
     });
   } catch (error) {
     console.error("❌ Error getAllAsistenMusyrif:", error);
-    res.status(500).json({ message: "Terjadi kesalahan server." });
+    return res.status(500).json({ message: "Terjadi kesalahan server." });
   }
 };
 
@@ -377,70 +532,107 @@ export const getAsistenMusyrifById = async (req, res) => {
     const asisten = await prisma.asistenMusyrif.findUnique({
       where: { id: Number(id) },
       include: {
-        user: { select: { id: true, name: true, email: true } },
+        user: { select: { id: true, name: true, email: true, isActive: true } },
         usroh: { select: { id: true, nama: true } },
       },
     });
 
     if (!asisten) return res.status(404).json({ message: "Asisten musyrif tidak ditemukan." });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Data asisten musyrif berhasil diambil.",
       data: asisten,
     });
   } catch (error) {
     console.error("❌ Error getAsistenMusyrifById:", error);
-    res.status(500).json({ message: "Terjadi kesalahan server." });
+    return res.status(500).json({ message: "Terjadi kesalahan server." });
   }
 };
 
 /**
- * Tambah Asisten Musyrif baru
+ * Tambah Asisten Musyrif baru (tanpa password, kirim email aktivasi)
  */
 export const createAsistenMusyrif = async (req, res) => {
   try {
-    const { name, email, password, usrohId } = req.body;
+    let { name, nim, email, usrohId } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: "Nama, email, dan password wajib diisi." });
+    if (!name || !nim || !email) {
+      return res.status(400).json({ message: "Nama, NIM, dan email wajib diisi (tanpa password)." });
     }
+
+    email = String(email).trim().toLowerCase();
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) return res.status(400).json({ message: "Email sudah terdaftar." });
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const activationToken = generateActivationToken();
+    const activationTokenHash = hashToken(activationToken);
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
     const result = await prisma.$transaction(async (tx) => {
       const newUser = await tx.user.create({
-        data: { name, email, password: hashedPassword, role: "ASISTEN" },
+        data: {
+          name,
+          email,
+          password: null,
+          role: "ASISTEN",
+          isActive: false,
+        },
       });
 
       const newAsisten = await tx.asistenMusyrif.create({
-        data: { userId: newUser.id, usrohId: usrohId || null },
+        data: {
+          userId: newUser.id,
+          // nim belum kamu simpan di tabel asisten; kalau di schema ada field nim, isi di sini
+          usrohId: usrohId ? Number(usrohId) : null,
+        },
+      });
+
+      await tx.accountActivationToken.create({
+        data: {
+          userId: newUser.id,
+          tokenHash: activationTokenHash,
+          expiresAt,
+        },
       });
 
       return { newUser, newAsisten };
     });
 
-    res.status(201).json({
-      success: true,
-      message: "Asisten musyrif berhasil ditambahkan.",
-      data: result,
-    });
+    // kirim email di luar transaksi
+    const feUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const activationLink = `${feUrl}/activate?token=${activationToken}`;
+
+    try {
+      await sendActivationEmail(email, activationLink);
+      return res.status(201).json({
+        success: true,
+        message: "Asisten musyrif berhasil ditambahkan. Link aktivasi sudah dikirim ke email.",
+        data: result,
+      });
+    } catch (mailErr) {
+      console.error("❌ Email activation gagal:", mailErr);
+      return res.status(201).json({
+        success: true,
+        message:
+          "Asisten musyrif berhasil ditambahkan, tapi email aktivasi gagal dikirim. Silakan coba kirim ulang aktivasi.",
+        data: result,
+      });
+    }
   } catch (error) {
     console.error("❌ Error createAsistenMusyrif:", error);
-    res.status(500).json({ message: "Terjadi kesalahan server." });
+    return res.status(500).json({ message: "Terjadi kesalahan server." });
   }
 };
 
 /**
- * Update Asisten Musyrif
+ * Update Asisten Musyrif (tanpa update password)
  */
 export const updateAsistenMusyrif = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, password, usrohId } = req.body;
+    let { name, email, usrohId } = req.body;
 
     const asisten = await prisma.asistenMusyrif.findUnique({
       where: { id: Number(id) },
@@ -449,31 +641,41 @@ export const updateAsistenMusyrif = async (req, res) => {
 
     if (!asisten) return res.status(404).json({ message: "Asisten musyrif tidak ditemukan." });
 
-    let hashedPassword = asisten.user.password;
-    if (password) hashedPassword = await bcrypt.hash(password, 10);
+    if (email) email = String(email).trim().toLowerCase();
+
+    // cek duplikasi email (kecuali user ini)
+    if (email) {
+      const existingUser = await prisma.user.findFirst({
+        where: { email, id: { not: asisten.user.id } },
+      });
+      if (existingUser) return res.status(400).json({ message: "Email sudah terdaftar pada user lain." });
+    }
 
     const updated = await prisma.$transaction(async (tx) => {
       const updatedUser = await tx.user.update({
         where: { id: asisten.user.id },
-        data: { name, email, password: hashedPassword },
+        data: {
+          ...(name !== undefined ? { name } : {}),
+          ...(email !== undefined ? { email } : {}),
+        },
       });
 
       const updatedAsisten = await tx.asistenMusyrif.update({
         where: { id: Number(id) },
-        data: { usrohId: usrohId || null },
+        data: { usrohId: usrohId ? Number(usrohId) : null },
       });
 
       return { updatedUser, updatedAsisten };
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Data asisten musyrif berhasil diperbarui.",
       data: updated,
     });
   } catch (error) {
     console.error("❌ Error updateAsistenMusyrif:", error);
-    res.status(500).json({ message: "Terjadi kesalahan server." });
+    return res.status(500).json({ message: "Terjadi kesalahan server." });
   }
 };
 
@@ -492,20 +694,26 @@ export const deleteAsistenMusyrif = async (req, res) => {
     if (!asisten) return res.status(404).json({ message: "Asisten musyrif tidak ditemukan." });
 
     await prisma.$transaction(async (tx) => {
+      // optional: invalidate token aktivasi yang belum kepakai
+      await tx.accountActivationToken.updateMany({
+        where: { userId: asisten.user.id, usedAt: null },
+        data: { usedAt: new Date() },
+      });
+
       await tx.asistenMusyrif.delete({ where: { id: Number(id) } });
       await tx.user.delete({ where: { id: asisten.user.id } });
     });
 
-    res.status(200).json({ success: true, message: "Asisten musyrif berhasil dihapus." });
+    return res.status(200).json({ success: true, message: "Asisten musyrif berhasil dihapus." });
   } catch (error) {
     console.error("❌ Error deleteAsistenMusyrif:", error);
-    res.status(500).json({ message: "Terjadi kesalahan server." });
+    return res.status(500).json({ message: "Terjadi kesalahan server." });
   }
 };
 
 /**
- * Import Asisten Musyrif dari Excel
- * Kolom: name | email | password | usrohId
+ * Import Asisten Musyrif dari Excel (tanpa password, kirim email aktivasi)
+ * Kolom: name | email | nim | usrohId   (nim opsional, sesuaikan file kamu)
  */
 export const importAsistenMusyrif = async (req, res) => {
   try {
@@ -521,39 +729,81 @@ export const importAsistenMusyrif = async (req, res) => {
     }
 
     const created = [];
+    const skipped = [];
+
+    const feUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
     for (const row of rows) {
-      const { name, email, password, usrohId } = row;
-      if (!name || !email || !password) continue;
+      const { name, email, nim, usrohId } = row;
+      if (!name || !email) {
+        skipped.push({ email, reason: "Kolom wajib kurang (name/email)" });
+        continue;
+      }
 
-      const existing = await prisma.user.findUnique({ where: { email } });
-      if (existing) continue;
+      const emailStr = String(email).trim().toLowerCase();
 
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const existing = await prisma.user.findUnique({ where: { email: emailStr } });
+      if (existing) {
+        skipped.push({ email: emailStr, reason: "Email sudah ada" });
+        continue;
+      }
 
-      const user = await prisma.user.create({
-        data: { name, email, password: hashedPassword, role: "ASISTEN" },
+      const activationToken = generateActivationToken();
+      const tokenHash = hashToken(activationToken);
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+      // create user + asisten + token (transaction)
+      const { user } = await prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            name: String(name),
+            email: emailStr,
+            password: null,
+            role: "ASISTEN",
+            isActive: false,
+          },
+        });
+
+        await tx.asistenMusyrif.create({
+          data: {
+            userId: user.id,
+            usrohId: usrohId ? Number(usrohId) : null,
+            // nim: nim ? String(nim) : null, // kalau ada field nim di model asisten
+          },
+        });
+
+        await tx.accountActivationToken.create({
+          data: { userId: user.id, tokenHash, expiresAt },
+        });
+
+        return { user };
       });
 
-      await prisma.asistenMusyrif.create({
-        data: { userId: user.id, usrohId: usrohId || null },
-      });
-
-      created.push({ name, email });
+      // kirim email per user
+      const activationLink = `${feUrl}/activate?token=${activationToken}`;
+      try {
+        await sendActivationEmail(user.email, activationLink);
+        created.push({ name: user.name, email: user.email });
+      } catch (mailErr) {
+        console.error(`❌ Email activation gagal (${user.email}):`, mailErr);
+        skipped.push({ email: user.email, reason: "Gagal kirim email aktivasi" });
+      }
     }
 
     fs.unlinkSync(req.file.path);
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: `Berhasil mengimpor ${created.length} data asisten musyrif.`,
       data: created,
+      skipped,
     });
   } catch (error) {
     console.error("❌ Error importAsistenMusyrif:", error);
-    res.status(500).json({ message: "Terjadi kesalahan saat import Excel." });
+    return res.status(500).json({ message: "Terjadi kesalahan saat import Excel." });
   }
 };
+
 
 /* ==========================================================
    ✅ CRUD DATA MUSYRIF (oleh Admin)
@@ -997,7 +1247,15 @@ export const deleteLantai = async (req, res) => {
 export const getAllUsroh = async (req, res) => {
   try {
     const usroh = await prisma.usroh.findMany({
-      include: { lantai: { select: { id: true, nama: true } } },
+      include: {
+        lantai: {
+          select: {
+            id: true,
+            nama: true,
+            gedung: { select: { id: true, nama: true } },
+          },
+        },
+      },
       orderBy: { id: "asc" },
     });
 
@@ -1008,7 +1266,10 @@ export const getAllUsroh = async (req, res) => {
         id: u.id,
         nama: u.nama,
         lantai: u.lantai ? u.lantai.nama : "-",
+        gedung: u.lantai?.gedung ? u.lantai.gedung.nama : "-",
         createdAt: u.createdAt,
+        // kalau FE kamu butuh struktur original juga, boleh return u langsung tanpa map
+        // atau tambahkan lantaiObj: u.lantai
       })),
     });
   } catch (error) {
@@ -1016,6 +1277,7 @@ export const getAllUsroh = async (req, res) => {
     res.status(500).json({ message: "Terjadi kesalahan server." });
   }
 };
+
 
 /**
  * Tambah usroh baru
@@ -1093,8 +1355,12 @@ import path from "path";
 export const getAllMateri = async (req, res) => {
   try {
     const materi = await prisma.materi.findMany({
-      orderBy: { id: "asc" },
-    });
+  include: {
+    kategori: { select: { id: true, nama: true } },
+  },
+  orderBy: { id: "asc" },
+});
+
 
     res.status(200).json({
       success: true,
@@ -1318,12 +1584,19 @@ export const updateTargetHafalan = async (req, res) => {
 export const deleteTargetHafalan = async (req, res) => {
   try {
     const { id } = req.params;
+    if (isNaN(id)) return res.status(400).json({ message: "ID tidak valid." });
 
-    const target = await prisma.targetHafalan.findUnique({ where: { id: Number(id) } });
-    if (!target) return res.status(404).json({ message: "Target hafalan tidak ditemukan." });
+    const target = await prisma.targetHafalan.findUnique({
+      where: { id: Number(id) },
+    });
+
+    if (!target) {
+      return res.status(404).json({ message: "Target hafalan tidak ditemukan." });
+    }
 
     await prisma.$transaction(async (tx) => {
-      await tx.subTarget.deleteMany({ where: { targetHafalanId: Number(id) } });
+      // schema kamu: model SubTargets, FK = targetId
+      await tx.subTargets.deleteMany({ where: { targetId: Number(id) } });
       await tx.targetHafalan.delete({ where: { id: Number(id) } });
     });
 
@@ -1337,30 +1610,39 @@ export const deleteTargetHafalan = async (req, res) => {
   }
 };
 
-/* ==========================================================
-   ✅ CRUD SUBTARGET (oleh Admin)
-   ========================================================== */
+
+/**
+ * =============================
+ * CRUD SUBTARGET (Admin)
+ * Model Prisma: SubTargets -> prisma.subTargets
+ * FK: targetId
+ * Relasi: targetHafalan
+ * =============================
+ */
 
 /**
  * Ambil semua SubTarget (beserta Target Hafalannya)
  */
 export const getAllSubTarget = async (req, res) => {
   try {
-    const subTargets = await prisma.subTarget.findMany({
+    const subTargets = await prisma.subTargets.findMany({
       include: {
-        target: {
+        targetHafalan: {
           select: {
             id: true,
             nama: true,
             surah: true,
+            ayatMulai: true,
+            ayatAkhir: true,
           },
         },
       },
       orderBy: { id: "asc" },
     });
 
-    if (!subTargets.length)
+    if (!subTargets.length) {
       return res.status(404).json({ message: "Belum ada data sub-target." });
+    }
 
     res.status(200).json({
       success: true,
@@ -1374,28 +1656,31 @@ export const getAllSubTarget = async (req, res) => {
 };
 
 /**
- * Ambil subtarget berdasarkan ID
+ * Ambil SubTarget berdasarkan ID (beserta Target Hafalannya)
  */
 export const getSubTargetById = async (req, res) => {
   try {
     const { id } = req.params;
     if (isNaN(id)) return res.status(400).json({ message: "ID tidak valid." });
 
-    const subTarget = await prisma.subTarget.findUnique({
+    const subTarget = await prisma.subTargets.findUnique({
       where: { id: Number(id) },
       include: {
-        target: {
+        targetHafalan: {
           select: {
             id: true,
             nama: true,
             surah: true,
+            ayatMulai: true,
+            ayatAkhir: true,
           },
         },
       },
     });
 
-    if (!subTarget)
+    if (!subTarget) {
       return res.status(404).json({ message: "Sub-target tidak ditemukan." });
+    }
 
     res.status(200).json({
       success: true,
@@ -1410,26 +1695,28 @@ export const getSubTargetById = async (req, res) => {
 
 /**
  * Tambahkan SubTarget baru
+ * body: { nama, targetId }
  */
 export const createSubTarget = async (req, res) => {
   try {
-    const { nama, targetHafalanId } = req.body;
+    const { nama, targetId } = req.body;
 
-    if (!nama || !targetHafalanId) {
+    if (!nama || !targetId) {
       return res.status(400).json({ message: "Nama dan ID target hafalan wajib diisi." });
     }
 
     const target = await prisma.targetHafalan.findUnique({
-      where: { id: Number(targetHafalanId) },
+      where: { id: Number(targetId) },
     });
 
-    if (!target)
+    if (!target) {
       return res.status(404).json({ message: "Target hafalan tidak ditemukan." });
+    }
 
-    const subTarget = await prisma.subTarget.create({
+    const subTarget = await prisma.subTargets.create({
       data: {
         nama,
-        targetHafalanId: Number(targetHafalanId),
+        targetId: Number(targetId),
       },
     });
 
@@ -1446,26 +1733,36 @@ export const createSubTarget = async (req, res) => {
 
 /**
  * Update SubTarget
+ * body: { nama?, targetId? }
  */
 export const updateSubTarget = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nama, targetHafalanId } = req.body;
+    if (isNaN(id)) return res.status(400).json({ message: "ID tidak valid." });
 
-    const subTarget = await prisma.subTarget.findUnique({
+    const { nama, targetId } = req.body;
+
+    const existing = await prisma.subTargets.findUnique({
       where: { id: Number(id) },
     });
 
-    if (!subTarget)
+    if (!existing) {
       return res.status(404).json({ message: "Sub-target tidak ditemukan." });
+    }
 
-    const updated = await prisma.subTarget.update({
+    // kalau targetId dikirim, pastikan target ada
+    if (targetId) {
+      const target = await prisma.targetHafalan.findUnique({
+        where: { id: Number(targetId) },
+      });
+      if (!target) return res.status(404).json({ message: "Target hafalan tidak ditemukan." });
+    }
+
+    const updated = await prisma.subTargets.update({
       where: { id: Number(id) },
       data: {
-        nama: nama || subTarget.nama,
-        targetHafalanId: targetHafalanId
-          ? Number(targetHafalanId)
-          : subTarget.targetHafalanId,
+        nama: nama ?? existing.nama,
+        targetId: targetId ? Number(targetId) : existing.targetId,
       },
     });
 
@@ -1486,15 +1783,19 @@ export const updateSubTarget = async (req, res) => {
 export const deleteSubTarget = async (req, res) => {
   try {
     const { id } = req.params;
+    if (isNaN(id)) return res.status(400).json({ message: "ID tidak valid." });
 
-    const subTarget = await prisma.subTarget.findUnique({
+    const existing = await prisma.subTargets.findUnique({
       where: { id: Number(id) },
     });
 
-    if (!subTarget)
+    if (!existing) {
       return res.status(404).json({ message: "Sub-target tidak ditemukan." });
+    }
 
-    await prisma.subTarget.delete({ where: { id: Number(id) } });
+    await prisma.subTargets.delete({
+      where: { id: Number(id) },
+    });
 
     res.status(200).json({
       success: true,
@@ -1505,6 +1806,7 @@ export const deleteSubTarget = async (req, res) => {
     res.status(500).json({ message: "Terjadi kesalahan server." });
   }
 };
+
 
 
 // ✅ Ambil semua nilai tahfidz (include resident & target hafalan)

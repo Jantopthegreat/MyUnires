@@ -42,9 +42,6 @@ export default function RevisiPage() {
 
   // Apply filters whenever residents, searchTerm, or selectedUsroh changes
   useEffect(() => {
-    // Debug log: residents dan usrohList
-    console.log("DEBUG: residents", residents);
-    console.log("DEBUG: usrohList", usrohList);
     let result = [...residents];
 
     // Filter by search
@@ -60,10 +57,10 @@ export default function RevisiPage() {
     if (selectedUsroh !== "all") {
       // Debug log
       if (result.length > 0) {
-        console.log("DEBUG: Filter usrohId", {
-          selectedUsroh,
-          data: result.map((r) => ({ id: r.id, usrohId: r.usrohId })),
-        });
+        // console.log("DEBUG: Filter usrohId", {
+        //   selectedUsroh,
+        //   data: result.map((r) => ({ id: r.id, usrohId: r.usrohId })),
+        // });
       }
       result = result.filter((item) => item.usrohId === Number(selectedUsroh));
     }
@@ -99,13 +96,9 @@ export default function RevisiPage() {
       });
       const usrohData = await usrohRes.json();
 
-      console.log("🔍 Debug - Residents Data:", residentsData);
-      console.log("🔍 Debug - Usroh Data:", usrohData);
-
       setResidents(residentsData.data || []);
       setUsrohList(usrohData.data || []);
     } catch (error) {
-      console.error("Error fetching data:", error);
       Swal.fire({
         icon: "error",
         title: "Error",
@@ -242,9 +235,7 @@ export default function RevisiPage() {
                       <tr>
                         <th className="py-3 text-left px-4 bg-white">No</th>
                         <th className="py-3 text-left px-4 bg-white">Nama</th>
-                        <th className="py-3 text-left px-4 bg-white">
-                          No. Unires
-                        </th>
+                        <th className="py-3 text-left px-4 bg-white">No. Unires</th>
                         <th className="py-3 text-left px-4 bg-white">Usroh</th>
                         <th className="py-3 text-center px-4 bg-white">Aksi</th>
                       </tr>
@@ -277,6 +268,10 @@ export default function RevisiPage() {
                 </div>
               </div>
             )}
+          </div>
+          {/* Info jumlah data */}
+          <div className="mt-3 text-sm text-gray-600">
+            Menampilkan {filteredData.length} dari {residents.length} resident
           </div>
         </section>
       </main>

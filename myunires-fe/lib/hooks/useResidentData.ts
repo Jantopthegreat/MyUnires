@@ -55,7 +55,7 @@ export function useResidentData() {
   const fetchResidents = async () => {
     try {
       setLoading(true);
-      const response = await apiGet<any>("/api/musyrif/residents/all");
+      const response = await apiGet<any>("/api/admin/resident");
 
       if (response.success) {
         setResidents(response.data);
@@ -75,7 +75,7 @@ export function useResidentData() {
 
   const fetchUsrohList = async () => {
     try {
-      const response = await apiGet<any>("/api/musyrif/usroh");
+      const response = await apiGet<any>("/api/admin/usroh");
       if (response.success) {
         setUsrohList(response.data);
       }
@@ -86,7 +86,7 @@ export function useResidentData() {
 
   const fetchLantaiList = async () => {
     try {
-      const response = await apiGet<any>("/api/musyrif/lantai");
+      const response = await apiGet<any>("/api/admin/lantai");
       if (response.success) {
         setLantaiList(response.data);
       }
