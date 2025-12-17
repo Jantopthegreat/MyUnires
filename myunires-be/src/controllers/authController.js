@@ -65,9 +65,9 @@ export const login = async (req, res) => {
     }
 
     // 2️⃣ Cek password TANPA bcrypt
-    if (password !== user.password) {
-      return res.status(400).json({ message: "Password salah" });
-    }
+    // cek password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ message: "Password salah" });
 
     // 3️⃣ Generate JWT
     const token = jwt.sign(
