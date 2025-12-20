@@ -8,18 +8,17 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect ke login setelah 3 detik
+    // Redirect ke login setelah 10 detik
     const timer = setTimeout(() => {
       router.push("/login");
-    }, 10000);
+    }, 5000);
 
-    // Cleanup timer saat component unmount
     return () => clearTimeout(timer);
   }, [router]);
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      {/* Background Image dengan overlay */}
+      {/* Background Image + overlay */}
       <div className="absolute inset-0 z-0">
         <Image
           src="/lg.jpg"
@@ -29,19 +28,18 @@ export default function Home() {
           className="object-cover object-center"
           quality={100}
         />
-        {/* Dark overlay untuk keterbacaan text */}
-        <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/60 to-[#004220]/80"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/60 to-[#004220]/80" />
       </div>
 
-      {/* Decorative elements */}
+      {/* Decorative */}
       <div className="absolute inset-0 z-10">
-        <div className="absolute top-0 left-0 w-96 h-96 bg-[#004220]/20 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#004220]/20 rounded-full blur-3xl"></div>
+        <div className="absolute top-0 left-0 w-96 h-96 bg-[#004220]/20 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#004220]/20 rounded-full blur-3xl" />
       </div>
 
-      {/* Main Content */}
+      {/* Main */}
       <div className="relative z-20 min-h-screen flex flex-col items-center justify-center px-6">
-        {/* Logo UMY dan UNIRES */}
+        {/* Logo */}
         <div className="flex items-center gap-8 mb-12 animate-fadeIn">
           <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 shadow-2xl">
             <Image
@@ -53,7 +51,9 @@ export default function Home() {
               className="object-contain"
             />
           </div>
-          <div className="h-24 w-px bg-white/30"></div>
+
+          <div className="h-24 w-px bg-white/30" />
+
           <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 shadow-2xl">
             <Image
               src="/lg_unires.svg"
@@ -66,7 +66,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Welcome Text */}
+        {/* Text */}
         <div
           className="text-center space-y-6 max-w-3xl animate-fadeIn"
           style={{ animationDelay: "0.2s" }}
@@ -74,7 +74,7 @@ export default function Home() {
           <h1 className="text-6xl md:text-7xl font-bold text-white tracking-tight">
             UNIRES
           </h1>
-          <div className="h-1 w-32 bg-gradient-to-r from-transparent via-white to-transparent mx-auto"></div>
+          <div className="h-1 w-32 bg-gradient-to-r from-transparent via-white to-transparent mx-auto" />
           <h2 className="text-3xl md:text-4xl font-semibold text-white/95">
             University Residence
           </h2>
@@ -86,13 +86,13 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Loading Progress Bar */}
+        {/* Loading */}
         <div
           className="mt-16 w-64 animate-fadeIn"
           style={{ animationDelay: "0.4s" }}
         >
           <div className="relative h-1 bg-white/20 rounded-full overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-white/60 to-white rounded-full animate-loadingBar"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-white/60 to-white rounded-full animate-loadingBar" />
           </div>
           <p className="text-white/60 text-sm text-center mt-4 font-light">
             Memuat sistem...

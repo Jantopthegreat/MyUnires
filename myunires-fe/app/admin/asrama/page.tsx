@@ -7,7 +7,14 @@ import { useRouter } from "next/navigation";
 
 import AdminSidebar from "@/components/adminSidebar";
 import { useAuth } from "@/lib/useAuth";
-import { apiDelete, apiGet, apiPost, apiPut, clearAuth, getUser } from "@/lib/api";
+import {
+  apiDelete,
+  apiGet,
+  apiPost,
+  apiPut,
+  clearAuth,
+  getUser,
+} from "@/lib/api";
 
 const ALLOWED_ROLES = ["ADMIN"];
 
@@ -16,9 +23,15 @@ const LANTAI_URL = "/api/admin/lantai";
 const USROH_URL = "/api/admin/usroh";
 
 type Gedung = { id: number; nama: string };
-type Lantai = { id: number; nama: string; gedung?: string; gedungId?: number; createdAt?: string };
+type Lantai = {
+  id: number;
+  nama: string;
+  gedung?: string;
+  gedungId?: number;
+  createdAt?: string;
+};
 
-// Sesuai backend kamu: lantai & gedung sudah string
+// sesuai backend: usroh list sudah flatten (lantai, gedung string)
 type UsrohRow = {
   id: number;
   nama: string;
@@ -41,9 +54,18 @@ export default function AdminAsramaPage() {
 
   // search + filters
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterGedung, setFilterGedung] = useState<string>("all"); // pakai nama gedung
-  const [filterLantai, setFilterLantai] = useState<string>("all"); // pakai nama lantai
-  const [filterUsrohId, setFilterUsrohId] = useState<string>("all"); // pakai id usroh
+  const [filterGedung, setFilterGedung] = useState<string>("all");
+  const [filterLantai, setFilterLantai] = useState<string>("all");
+  const [filterUsrohId, setFilterUsrohId] = useState<string>("all");
+
+  // Detail modal
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [detailRow, setDetailRow] = useState<UsrohRow | null>(null);
+
+  const openDetailModal = (r: UsrohRow) => {
+    setDetailRow(r);
+    setShowDetailModal(true);
+  };
 
   // modal add/edit (usroh)
   const [showModal, setShowModal] = useState(false);
@@ -52,7 +74,7 @@ export default function AdminAsramaPage() {
 
   // form
   const [formNama, setFormNama] = useState("");
-  const [formLantaiId, setFormLantaiId] = useState<string>(""); // create/update usroh butuh lantaiId (number)
+  const [formLantaiId, setFormLantaiId] = useState<string>("");
 
   const didFetch = useRef(false);
 
@@ -78,7 +100,11 @@ export default function AdminAsramaPage() {
       setLantai(Array.isArray(resL.data) ? resL.data : []);
       setRows(Array.isArray(resU.data) ? resU.data : []);
     } catch (e: any) {
-      Swal.fire({ icon: "error", title: "Error", text: e?.message || "Gagal memuat data asrama." });
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: e?.message || "Gagal memuat data asrama.",
+      });
     } finally {
       setLoading(false);
     }
@@ -89,7 +115,7 @@ export default function AdminAsramaPage() {
     router.push("/login");
   };
 
-  // opsi filter (pakai string dari rows, biar pasti match)
+  // opsi filter dari rows (biar pasti match)
   const gedungOptions = useMemo(() => {
     const set = new Set<string>();
     rows.forEach((r) => r.gedung && r.gedung !== "-" && set.add(r.gedung));
@@ -105,9 +131,12 @@ export default function AdminAsramaPage() {
   const filteredRows = useMemo(() => {
     let result = [...rows];
 
-    if (filterGedung !== "all") result = result.filter((r) => r.gedung === filterGedung);
-    if (filterLantai !== "all") result = result.filter((r) => r.lantai === filterLantai);
-    if (filterUsrohId !== "all") result = result.filter((r) => String(r.id) === filterUsrohId);
+    if (filterGedung !== "all")
+      result = result.filter((r) => r.gedung === filterGedung);
+    if (filterLantai !== "all")
+      result = result.filter((r) => r.lantai === filterLantai);
+    if (filterUsrohId !== "all")
+      result = result.filter((r) => String(r.id) === filterUsrohId);
 
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
@@ -136,31 +165,58 @@ export default function AdminAsramaPage() {
     setModalMode("edit");
     setSelected(r);
     setFormNama(r.nama || "");
-    // lantaiId nggak ada di row karena backend flatten; user pilih ulang saat edit
+    // backend flatten -> lantaiId tidak ada, maka pilih ulang
     setFormLantaiId("");
     setShowModal(true);
   };
 
   const handleSave = async () => {
     if (!formNama.trim() || !formLantaiId) {
-      Swal.fire({ icon: "error", title: "Validasi", text: "Nama usroh dan lantai wajib diisi." });
+      Swal.fire({
+        icon: "error",
+        title: "Validasi",
+        text: "Nama usroh dan lantai wajib diisi.",
+      });
       return;
     }
 
     const payload = { nama: formNama.trim(), lantaiId: Number(formLantaiId) };
 
+    if (Number.isNaN(payload.lantaiId) || payload.lantaiId <= 0) {
+      Swal.fire({
+        icon: "error",
+        title: "Validasi",
+        text: "Lantai tidak valid.",
+      });
+      return;
+    }
+
     try {
       if (modalMode === "add") {
         await apiPost<any>(USROH_URL, payload);
-        Swal.fire({ icon: "success", title: "Berhasil!", text: "Usroh ditambahkan.", timer: 1200 });
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil!",
+          text: "Usroh ditambahkan.",
+          timer: 1200,
+        });
       } else if (selected) {
         await apiPut<any>(`${USROH_URL}/${selected.id}`, payload);
-        Swal.fire({ icon: "success", title: "Berhasil!", text: "Usroh diupdate.", timer: 1200 });
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil!",
+          text: "Usroh diupdate.",
+          timer: 1200,
+        });
       }
       setShowModal(false);
       fetchAll();
     } catch (e: any) {
-      Swal.fire({ icon: "error", title: "Gagal", text: e?.message || "Terjadi kesalahan." });
+      Swal.fire({
+        icon: "error",
+        title: "Gagal",
+        text: e?.message || "Terjadi kesalahan.",
+      });
     }
   };
 
@@ -180,10 +236,23 @@ export default function AdminAsramaPage() {
 
     try {
       await apiDelete<any>(`${USROH_URL}/${r.id}`);
-      Swal.fire({ icon: "success", title: "Terhapus!", text: "Usroh berhasil dihapus.", timer: 1200 });
+      Swal.fire({
+        icon: "success",
+        title: "Terhapus!",
+        text: "Usroh berhasil dihapus.",
+        timer: 1200,
+      });
+
+      setShowDetailModal(false);
+      setDetailRow(null);
+
       fetchAll();
     } catch (e: any) {
-      Swal.fire({ icon: "error", title: "Error", text: e?.message || "Gagal menghapus usroh." });
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: e?.message || "Gagal menghapus usroh.",
+      });
     }
   };
 
@@ -198,27 +267,28 @@ export default function AdminAsramaPage() {
             <img src="/lg_umy.svg" alt="UMY" className="h-8" />
             <img src="/lg_unires.svg" alt="UNIRES" className="h-8" />
           </div>
-
-          <button
-            onClick={() => setShowLogoutModal(true)}
-            className="bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2 rounded-full text-xs shadow transition"
-          >
-            Log Out
-          </button>
         </div>
       </header>
 
-      {/* Logout modal */}
+      {/* Logout modal (sesuai referensi) */}
       {showLogoutModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl p-8 w-[360px] text-center">
-            <h2 className="text-xl font-semibold text-[#004220] mb-3">Log Out</h2>
+        <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 w-full max-w-sm text-center">
+            <h2 className="text-xl font-semibold text-[#004220] mb-3">
+              Log Out
+            </h2>
             <p className="text-gray-600 text-sm mb-6">Akhiri sesi login?</p>
             <div className="flex justify-center gap-3">
-              <button onClick={() => setShowLogoutModal(false)} className="px-5 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg">
+              <button
+                onClick={() => setShowLogoutModal(false)}
+                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg"
+              >
                 Batal
               </button>
-              <button onClick={handleLogout} className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg">
+              <button
+                onClick={handleLogout}
+                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"
+              >
                 Log Out
               </button>
             </div>
@@ -227,96 +297,105 @@ export default function AdminAsramaPage() {
       )}
 
       {/* BODY */}
-      <div className="mx-auto max-w-7xl px-6 py-6 flex gap-6">
-        <AdminSidebar userName={userData?.name} userEmail={userData?.email} />
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 py-4 sm:py-6 flex flex-col md:flex-row gap-4 md:gap-6">
+        <AdminSidebar
+          userName={userData?.name}
+          userEmail={userData?.email}
+          onLogoutClick={() => setShowLogoutModal(true)}
+        />
 
         <main className="flex-1 min-w-0">
           <div className="bg-[#004220] text-white text-center py-5 rounded-2xl text-xl font-semibold shadow-sm">
             Kelola Asrama
           </div>
 
-          {/* Search + actions */}
-          <div className="mt-6 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+          {/* Filter bar + Add (sesuai pattern referensi) */}
+          <div className="mt-6 flex items-center justify-between gap-4 max-sm:flex-col max-sm:items-stretch">
+            {/* kiri: search + filter */}
+            <div className="flex items-center gap-3 max-sm:w-full max-sm:flex-col max-sm:items-stretch">
+              <div className="relative max-sm:w-full">
+                <FaSearch
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  size={14}
+                />
                 <input
                   type="text"
                   placeholder="Cari Data"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 pr-3 py-2 border rounded-lg text-sm w-64"
+                  className="pl-9 pr-3 py-2 border rounded-lg text-sm w-64 max-sm:w-full"
                 />
               </div>
 
-              {/* Import Data (opsional) */}
-              {/* <button className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">Import Data</button> */}
+              <select
+                value={filterGedung}
+                onChange={(e) => setFilterGedung(e.target.value)}
+                className="px-3 py-2 border rounded-lg text-sm max-sm:w-full"
+              >
+                <option value="all">Gedung (All)</option>
+                {gedungOptions
+                  .filter((x) => x !== "all")
+                  .map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+              </select>
+
+              <select
+                value={filterLantai}
+                onChange={(e) => setFilterLantai(e.target.value)}
+                className="px-3 py-2 border rounded-lg text-sm max-sm:w-full"
+              >
+                <option value="all">Lantai (All)</option>
+                {lantaiOptions
+                  .filter((x) => x !== "all")
+                  .map((l) => (
+                    <option key={l} value={l}>
+                      {l}
+                    </option>
+                  ))}
+              </select>
+
+              <select
+                value={filterUsrohId}
+                onChange={(e) => setFilterUsrohId(e.target.value)}
+                className="px-3 py-2 border rounded-lg text-sm max-sm:w-full"
+              >
+                <option value="all">Usroh (All)</option>
+                {rows.map((r) => (
+                  <option key={r.id} value={String(r.id)}>
+                    {r.nama}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <button
-              onClick={openAddModal}
-              className="bg-[#16a34a] hover:bg-[#15803d] text-white px-5 py-2 rounded-full flex items-center shadow-sm transition font-semibold text-sm"
-            >
-              <FaPlus className="mr-2" /> Add Data
-            </button>
-          </div>
-
-          {/* Filters */}
-          <div className="mt-4 flex flex-wrap gap-3">
-            <select
-              value={filterGedung}
-              onChange={(e) => setFilterGedung(e.target.value)}
-              className="px-3 py-2 border rounded-lg text-sm"
-            >
-              <option value="all">Gedung (All)</option>
-              {gedungOptions
-                .filter((x) => x !== "all")
-                .map((g) => (
-                  <option key={g} value={g}>
-                    {g}
-                  </option>
-                ))}
-            </select>
-
-            <select
-              value={filterLantai}
-              onChange={(e) => setFilterLantai(e.target.value)}
-              className="px-3 py-2 border rounded-lg text-sm"
-            >
-              <option value="all">Lantai (All)</option>
-              {lantaiOptions
-                .filter((x) => x !== "all")
-                .map((l) => (
-                  <option key={l} value={l}>
-                    {l}
-                  </option>
-                ))}
-            </select>
-
-            <select
-              value={filterUsrohId}
-              onChange={(e) => setFilterUsrohId(e.target.value)}
-              className="px-3 py-2 border rounded-lg text-sm"
-            >
-              <option value="all">Usroh (All)</option>
-              {rows.map((r) => (
-                <option key={r.id} value={String(r.id)}>
-                  {r.nama}
-                </option>
-              ))}
-            </select>
+            {/* kanan: add */}
+            <div className="flex items-center gap-3 max-sm:w-full max-sm:justify-end">
+              <button
+                onClick={openAddModal}
+                className="bg-[#16a34a] hover:bg-[#15803d] text-white px-5 py-2 rounded-full flex items-center shadow-sm transition font-semibold text-sm max-sm:px-3 max-sm:text-xs"
+              >
+                <FaPlus className="mr-2" /> Add Data
+              </button>
+            </div>
           </div>
 
           {/* Table */}
           <section className="mt-6 bg-white rounded-2xl shadow-sm border overflow-hidden">
             {loading && rows.length === 0 ? (
-              <div className="text-center py-10 text-gray-500">Memuat data...</div>
+              <div className="text-center py-10 text-gray-500">
+                Memuat data...
+              </div>
             ) : filteredRows.length === 0 ? (
-              <div className="text-center py-10 text-gray-500">Tidak ada data</div>
+              <div className="text-center py-10 text-gray-500">
+                Tidak ada data
+              </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b">
+                  <thead className="bg-gray-50 border-b sticky top-0 z-10">
                     <tr>
                       <th className="py-3 px-4 text-left">No</th>
                       <th className="py-3 px-4 text-left">Gedung</th>
@@ -332,13 +411,34 @@ export default function AdminAsramaPage() {
                         <td className="py-3 px-4">{r.gedung || "-"}</td>
                         <td className="py-3 px-4">{r.lantai || "-"}</td>
                         <td className="py-3 px-4">{r.nama}</td>
-                        <td className="py-3 px-4 text-center">
-                          <button onClick={() => openEditModal(r)} className="text-blue-600 hover:underline mr-3">
-                            Edit
-                          </button>
-                          <button onClick={() => handleDelete(r)} className="text-red-600 hover:underline">
-                            Hapus
-                          </button>
+                        <td className="py-3 px-4">
+                          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
+                            <button
+                              onClick={() => openDetailModal(r)}
+                              className="hover:opacity-80"
+                              title="Detail"
+                            >
+                              <img
+                                src="/eye_icon.svg"
+                                alt="Detail"
+                                className="w-5 h-5 shrink-0"
+                              />
+                            </button>
+
+                            <button
+                              onClick={() => openEditModal(r)}
+                              className="text-blue-600 hover:underline"
+                            >
+                              Edit
+                            </button>
+
+                            <button
+                              onClick={() => handleDelete(r)}
+                              className="text-red-600 hover:underline"
+                            >
+                              Hapus
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -354,11 +454,82 @@ export default function AdminAsramaPage() {
         </main>
       </div>
 
+      {/* Detail Modal */}
+      {showDetailModal && detailRow && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Detail Asrama</h2>
+              <button
+                onClick={() => {
+                  setShowDetailModal(false);
+                  setDetailRow(null);
+                }}
+                className="text-sm text-gray-600 hover:underline"
+              >
+                Tutup
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <div className="text-gray-500">Gedung</div>
+                <div className="font-medium break-words">
+                  {detailRow.gedung || "-"}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-gray-500">Lantai</div>
+                <div className="font-medium break-words">
+                  {detailRow.lantai || "-"}
+                </div>
+              </div>
+
+              <div className="col-span-2">
+                <div className="text-gray-500">Usroh</div>
+                <div className="font-medium break-words">
+                  {detailRow.nama || "-"}
+                </div>
+              </div>
+
+              <div className="col-span-2">
+                <div className="text-gray-500">Created At</div>
+                <div className="font-medium break-all">
+                  {detailRow.createdAt || "-"}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowDetailModal(false);
+                  openEditModal(detailRow);
+                }}
+                className="px-4 py-2 border rounded-lg hover:bg-gray-50 text-blue-700 border-blue-200"
+              >
+                Edit
+              </button>
+
+              <button
+                onClick={() => handleDelete(detailRow)}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Hapus
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Add/Edit Usroh */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-semibold mb-4">{modalMode === "add" ? "Tambah Usroh" : "Edit Usroh"}</h2>
+            <h2 className="text-lg font-semibold mb-4">
+              {modalMode === "add" ? "Tambah Usroh" : "Edit Usroh"}
+            </h2>
 
             <div className="space-y-3">
               <div>
@@ -386,24 +557,31 @@ export default function AdminAsramaPage() {
                   <option value="">Pilih Lantai</option>
                   {lantai.map((l) => (
                     <option key={l.id} value={String(l.id)}>
-                      {/* dari getAllLantai kamu sudah include nama gedung (string) [file:41] */}
                       {l.gedung ? `${l.gedung} - ${l.nama}` : l.nama}
                     </option>
                   ))}
                 </select>
+
                 {modalMode === "edit" && (
                   <div className="text-xs text-gray-500 mt-1">
-                    Karena response usroh kamu sudah di-flatten, saat edit perlu pilih ulang lantai.
+                    Saat edit, pilih ulang lantai karena response usroh kamu
+                    sudah di-flatten.
                   </div>
                 )}
               </div>
             </div>
 
             <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => setShowModal(false)} className="px-4 py-2 border rounded-lg hover:bg-gray-50">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+              >
                 Batal
               </button>
-              <button onClick={handleSave} className="px-4 py-2 bg-[#004220] text-white rounded-lg hover:bg-[#003318]">
+              <button
+                onClick={handleSave}
+                className="px-4 py-2 bg-[#004220] text-white rounded-lg hover:bg-[#003318]"
+              >
                 Simpan
               </button>
             </div>

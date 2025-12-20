@@ -1,6 +1,7 @@
 import express from "express";
 import multer from "multer";
 import {
+  getProfileMusyrif,
   getAllResidents,
   getAllUsroh,
   getAllLantai,
@@ -21,6 +22,7 @@ import {
   deleteAssignment,
   getAllMateri,
   getAllKategoriMateri,
+
 } from "../controllers/musyrifController.js";
 import { verifyToken, isMusyrif } from "../middlewares/authMiddleware.js";
 
@@ -52,6 +54,9 @@ const uploadAssignmentFile = multer({
   }
 });
 
+
+// ===== PROFILE =====
+router.get("/profile", verifyToken, isMusyrif, getProfileMusyrif);
 // ===== RESIDENT ROUTES =====
 // Get all residents (dengan filter)
 router.get("/residents/all", verifyToken, isMusyrif, getAllResidents);

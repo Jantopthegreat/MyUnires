@@ -1,6 +1,8 @@
 "use client";
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useMemo } from "react";
 import { FaArrowLeft, FaClipboardList, FaCheckCircle } from "react-icons/fa";
+import { FiMenu } from "react-icons/fi";
 import Sidebar_Resident from "@/components/Sidebar_Resident";
 
 interface KategoriMateri {
@@ -28,20 +30,20 @@ interface Assignment {
 }
 
 export default function KerjakanAssignmentPage() {
+  // desktop collapse
   const [isOpen, setIsOpen] = useState(true);
   const toggleSidebar = () => setIsOpen((prev) => !prev);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  // mobile drawer
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const [kategoriList, setKategoriList] = useState<KategoriMateri[]>([]);
   const [assignmentList, setAssignmentList] = useState<Assignment[]>([]);
   const [selectedKategori, setSelectedKategori] =
     useState<KategoriMateri | null>(null);
-  const [filteredAssignments, setFilteredAssignments] = useState<Assignment[]>(
-    []
-  );
   const [loading, setLoading] = useState(true);
 
-  // Quiz Modal States
+  // Quiz modal
   const [showQuizModal, setShowQuizModal] = useState(false);
   const [selectedAssignment, setSelectedAssignment] =
     useState<Assignment | null>(null);
@@ -52,7 +54,6 @@ export default function KerjakanAssignmentPage() {
     correctAnswer: string;
   } | null>(null);
 
-  // Fetch kategori and assignments
   useEffect(() => {
     const fetchKategori = async () => {
       try {
@@ -66,10 +67,6 @@ export default function KerjakanAssignmentPage() {
             },
           }
         );
-
-        if (!response.ok)
-          throw new Error(`HTTP error! status: ${response.status}`);
-
         const result = await response.json();
         const data = result.data || result.kategori || result;
         setKategoriList(Array.isArray(data) ? data : []);
@@ -91,10 +88,6 @@ export default function KerjakanAssignmentPage() {
             },
           }
         );
-
-        if (!response.ok)
-          throw new Error(`HTTP error! status: ${response.status}`);
-
         const result = await response.json();
         const data = result.data || result.assignments || result;
         setAssignmentList(Array.isArray(data) ? data : []);
@@ -110,23 +103,15 @@ export default function KerjakanAssignmentPage() {
     fetchAssignments();
   }, []);
 
-  // Filter assignments by kategori
-  useEffect(() => {
-    if (selectedKategori) {
-      const filtered = assignmentList.filter(
-        (a) => a.materi?.kategori?.id === selectedKategori.id
-      );
-      setFilteredAssignments(filtered);
-    }
+  const filteredAssignments = useMemo(() => {
+    if (!selectedKategori) return [];
+    return assignmentList.filter(
+      (a) => a.materi?.kategori?.id === selectedKategori.id
+    );
   }, [selectedKategori, assignmentList]);
-
-  const handleKategoriClick = (kategori: KategoriMateri) => {
-    setSelectedKategori(kategori);
-  };
 
   const handleBackToKategori = () => {
     setSelectedKategori(null);
-    setFilteredAssignments([]);
   };
 
   const handleStartQuiz = (assignment: Assignment) => {
@@ -141,14 +126,12 @@ export default function KerjakanAssignmentPage() {
 
     const isCorrect = selectedAnswer === selectedAssignment.jawabanBenar;
 
-    // Tampilkan hasil
     setQuizResult({
       show: true,
       isCorrect,
       correctAnswer: selectedAssignment.jawabanBenar,
     });
 
-    // Submit ke backend (opsional)
     try {
       const token = localStorage.getItem("token");
       await fetch("http://localhost:3001/api/resident/assignment/submit", {
@@ -173,319 +156,327 @@ export default function KerjakanAssignmentPage() {
     setSelectedAnswer("");
     setQuizResult(null);
   };
+
+  const optionText = (a: Assignment, opt: string) => {
+    const key = `opsi${opt}` as keyof Assignment;
+    return a[key] as string;
+  };
+
   return (
-    <div className="min-h-screen flex bg-white">
-      {/* ===== HEADER LOGO ===== */}
-      <header className="fixed top-0 left-0 right-0 bg-white z-30 h-16 flex items-center justify-between px-6 border-b">
-        <div className="flex items-center gap-3">
-          <img src="/lg_umy.svg" alt="UMY" className="h-10 object-contain" />
-          <img
-            src="/lg_unires.svg"
-            alt="UNIRES"
-            className="h-10 object-contain"
-          />
-        </div>
-        <button
-          onClick={() => setShowLogoutModal(true)}
-          className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-md transition"
-        >
-          Logout
-        </button>
-      </header>
+    <div className="min-h-screen bg-[#F5F5F5]">
+      {/* HEADER (tanpa logout) */}
+      <header className="h-16 bg-white border-b flex items-center sticky top-0 z-30">
+        <div className="w-full px-4 sm:px-6 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+              aria-label="Open menu"
+            >
+              <FiMenu size={18} className="text-[#0D6B44]" />
+            </button>
 
-      {/* ===== LOGOUT MODAL ===== */}
-      {showLogoutModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-white/90 z-50">
-          <div className="bg-[#d1d4d0] rounded-3xl shadow-lg p-8 w-[400px] text-center">
-            <h2 className="text-2xl font-semibold text-[#004220] mb-4">
-              Log Out
-            </h2>
-            <p className="text-gray-700 text-sm mb-1">
-              Tindakan ini akan mengakhiri sesi login Anda.
-            </p>
-            <p className="text-gray-700 text-sm mb-6">
-              Apakah Anda ingin melanjutkan?
-            </p>
+            <img
+              src="/lg_umy.svg"
+              alt="UMY"
+              className="h-6 sm:h-8 w-auto shrink-0"
+            />
+            <img
+              src="/lg_unires.svg"
+              alt="UNIRES"
+              className="h-6 sm:h-8 w-auto shrink-0"
+            />
+          </div>
 
-            <div className="flex justify-center gap-4">
-              <button
-                onClick={() => setShowLogoutModal(false)}
-                className="bg-[#FFC107] hover:bg-[#ffb300] text-white font-semibold px-6 py-2 rounded-full shadow-md"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  localStorage.removeItem("token");
-                  window.location.href = "/login";
-                }}
-                className="bg-[#E50914] hover:bg-red-700 text-white font-semibold px-6 py-2 rounded-full shadow-md"
-              >
-                Log Out
-              </button>
-            </div>
+          <div className="text-right">
+            <p className="text-xs text-gray-500">Resident</p>
+            <p className="text-sm font-semibold text-[#004220] leading-tight">
+              Assignment
+            </p>
           </div>
         </div>
-      )}
+      </header>
 
-      {/* ===== SIDEBAR ===== */}
-      <Sidebar_Resident isOpen={isOpen} toggleSidebar={toggleSidebar} />
+      {/* SIDEBAR */}
+      <Sidebar_Resident
+        isOpen={isOpen}
+        toggleSidebar={toggleSidebar}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
+      />
 
-      {/* ===== MAIN CONTENT ===== */}
+      {/* MAIN */}
       <main
-        className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
-          isOpen ? "ml-64" : "ml-12"
-        }`}
+        className={[
+          "transition-all duration-300",
+          isOpen ? "md:pl-64" : "md:pl-14",
+        ].join(" ")}
       >
-        {/* Spacer supaya tidak ketabrak header */}
-        <div className="h-16" />
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-6">
+          {/* Title bar */}
+          <div className="bg-[#004220] text-white text-center py-5 rounded-2xl text-xl font-semibold shadow-sm">
+            Kerjakan Assignment
+          </div>
 
-        {/* Header hijau */}
-        <header className="px-6 py-4 mb-5">
-          <h1 className="bg-[#004220] text-white text-center py-6 rounded-md text-lg font-semibold">
-            Assignment
-          </h1>
-        </header>
-
-        {/* ===== Content ===== */}
-        <section className="px-6 pb-6">
-          {loading ? (
-            <div className="flex justify-center items-center py-20">
-              <div className="text-gray-500">Memuat data...</div>
-            </div>
-          ) : !selectedKategori ? (
-            /* ===== Kategori List ===== */
-            <div className="px-6 py-4 mb-5 space-y-4">
-              {kategoriList.length === 0 ? (
-                <div className="text-center py-10">
-                  <p className="text-gray-500 mb-2">
-                    Tidak ada kategori assignment tersedia
-                  </p>
-                  <p className="text-sm text-gray-400">
-                    Silakan cek koneksi atau hubungi administrator
-                  </p>
-                </div>
-              ) : (
-                kategoriList.map((kategori) => (
-                  <button
-                    key={kategori.id}
-                    onClick={() => handleKategoriClick(kategori)}
-                    className="w-full bg-white text-[#004220] text-center py-3 rounded-md text-lg font-semibold border border-[#004220] hover:bg-[#004220] hover:text-white transition-all duration-200"
-                  >
-                    {kategori.nama}
-                  </button>
-                ))
-              )}
-            </div>
-          ) : (
-            /* ===== Assignment List ===== */
-            <div className="px-6 py-4">
-              {/* Back Button */}
-              <button
-                onClick={handleBackToKategori}
-                className="mb-5 flex items-center gap-2 text-[#004220] hover:text-[#003318] font-medium transition"
-              >
-                <FaArrowLeft />
-                Kembali ke Kategori
-              </button>
-
-              {/* Kategori Title */}
-              <div className="mb-5">
-                <h2 className="text-2xl font-bold text-[#004220] mb-2">
-                  {selectedKategori.nama}
-                </h2>
-                <p className="text-gray-600">
-                  {filteredAssignments.length} assignment tersedia
-                </p>
+          {/* CONTENT */}
+          <section className="mt-6">
+            {loading ? (
+              <div className="bg-white rounded-2xl border shadow-sm py-16 text-center text-gray-500">
+                Memuat data...
               </div>
-
-              {/* Assignment Cards */}
-              {filteredAssignments.length === 0 ? (
-                <div className="text-center py-10 text-gray-500">
-                  Belum ada assignment untuk kategori ini
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {filteredAssignments.map((assignment) => (
-                    <div
-                      key={assignment.id}
-                      className="bg-white border border-gray-300 rounded-lg p-5 hover:shadow-lg transition-all duration-200"
-                    >
-                      {/* Assignment Icon & Title */}
-                      <div className="flex items-start gap-3 mb-3">
-                        <div className="bg-[#004220] p-3 rounded-md">
-                          <FaClipboardList className="text-white text-xl" />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-[#004220] mb-1">
-                            {assignment.judul}
-                          </h3>
-                          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                            {assignment.materi?.judul || "Materi"}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Assignment Question Preview */}
-                      <p className="text-gray-700 text-sm mb-4 leading-relaxed line-clamp-2">
-                        {assignment.pertanyaan}
-                      </p>
-
-                      {/* Start Quiz Button */}
+            ) : !selectedKategori ? (
+              <>
+                {/* KATEGORI GRID */}
+                {kategoriList.length === 0 ? (
+                  <div className="bg-white rounded-2xl border shadow-sm py-12 text-center">
+                    <p className="text-gray-600 font-semibold">
+                      Tidak ada kategori assignment
+                    </p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      Cek koneksi atau hubungi administrator.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {kategoriList.map((k) => (
                       <button
-                        onClick={() => handleStartQuiz(assignment)}
-                        className="w-full bg-[#004220] hover:bg-[#003318] text-white font-medium py-2 px-4 rounded-md transition"
+                        key={k.id}
+                        onClick={() => setSelectedKategori(k)}
+                        className="group text-left bg-white border rounded-2xl shadow-sm p-5 hover:shadow-md transition"
                       >
-                        Kerjakan Quiz
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs text-gray-500">Kategori</p>
+                            <h3 className="text-[#004220] text-lg font-semibold mt-1">
+                              {k.nama}
+                            </h3>
+                            <p className="text-sm text-gray-500 mt-2">
+                              Lihat assignment untuk kategori ini.
+                            </p>
+                          </div>
+                          <div className="h-11 w-11 rounded-xl bg-emerald-50 ring-1 ring-emerald-100 flex items-center justify-center shrink-0">
+                            <FaClipboardList className="text-[#0D6B44] text-lg" />
+                          </div>
+                        </div>
+                        <div className="mt-4 inline-flex items-center text-sm font-semibold text-[#0D6B44] group-hover:underline">
+                          Buka
+                        </div>
                       </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </section>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* HEADER KATEGORI + BACK */}
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <button
+                    onClick={handleBackToKategori}
+                    className="inline-flex items-center gap-2 text-[#004220] hover:text-[#003318] font-semibold transition"
+                  >
+                    <FaArrowLeft />
+                    Kembali
+                  </button>
 
-        {/* ===== QUIZ MODAL ===== */}
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">Kategori</p>
+                    <p className="text-base font-semibold text-[#004220]">
+                      {selectedKategori.nama}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 bg-white rounded-2xl border shadow-sm p-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-xl font-bold text-[#004220]">
+                        {selectedKategori.nama}
+                      </h2>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {filteredAssignments.length} assignment tersedia
+                      </p>
+                    </div>
+
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 whitespace-nowrap">
+                      Quiz
+                    </span>
+                  </div>
+                </div>
+
+                {/* ASSIGNMENT LIST */}
+                <div className="mt-4">
+                  {filteredAssignments.length === 0 ? (
+                    <div className="bg-white rounded-2xl border shadow-sm py-12 text-center text-gray-500">
+                      Belum ada assignment untuk kategori ini
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {filteredAssignments.map((a) => (
+                        <div
+                          key={a.id}
+                          className="bg-white border rounded-2xl shadow-sm p-5 hover:shadow-md transition"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="h-11 w-11 rounded-xl bg-[#004220] flex items-center justify-center shrink-0">
+                              <FaClipboardList className="text-white text-lg" />
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <h3 className="text-lg font-semibold text-[#004220] leading-snug">
+                                {a.judul}
+                              </h3>
+                              <div className="mt-1">
+                                <span className="text-[11px] text-gray-600 bg-gray-100 px-2 py-1 rounded-full">
+                                  {a.materi?.judul || "Materi"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <p className="text-gray-700 text-sm mt-4 leading-relaxed line-clamp-2">
+                            {a.pertanyaan}
+                          </p>
+
+                          <button
+                            onClick={() => handleStartQuiz(a)}
+                            className="mt-5 w-full inline-flex items-center justify-center rounded-xl bg-[#004220] hover:bg-[#003318] text-white font-semibold py-2.5 transition"
+                          >
+                            Kerjakan Quiz
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+
+        {/* QUIZ MODAL */}
         {showQuizModal && selectedAssignment && (
-          <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden border border-gray-200">
-              {/* Header */}
-              <div className="bg-[#004220] px-8 py-5 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-white">
+          <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4">
+            <div className="w-full max-w-2xl max-h-[90vh] bg-white rounded-2xl shadow-xl border overflow-hidden">
+              {/* modal header */}
+              <div className="bg-[#004220] px-5 sm:px-6 py-4 flex items-center justify-between">
+                <div className="min-w-0">
+                  <p className="text-white/80 text-xs">Quiz</p>
+                  <h2 className="text-white text-lg sm:text-xl font-semibold truncate">
                     {selectedAssignment.judul}
                   </h2>
-                  <button
-                    onClick={handleCloseQuiz}
-                    className="text-white hover:text-gray-200 transition"
-                  >
-                    <svg
-                      className="w-6 h-6"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
                 </div>
+
+                <button
+                  onClick={handleCloseQuiz}
+                  className="text-white/90 hover:text-white p-2 rounded-lg hover:bg-white/10 transition"
+                  aria-label="Close"
+                >
+                  <span className="text-xl leading-none">×</span>
+                </button>
               </div>
 
-              {/* Body */}
-              <div className="p-8 overflow-y-auto max-h-[calc(90vh-180px)]">
+              {/* modal body scroll */}
+              <div className="p-5 sm:p-6 overflow-y-auto max-h-[calc(90vh-132px)]">
                 {!quizResult?.show ? (
-                  <div className="space-y-5">
-                    {/* Materi Info */}
-                    <div className="bg-gray-50 border border-gray-300 rounded-md p-4">
-                      <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1 block">
+                  <div className="space-y-4">
+                    <div className="rounded-2xl bg-gray-50 border p-4">
+                      <p className="text-xs font-semibold text-gray-500">
                         Materi
-                      </label>
-                      <p className="text-base font-semibold text-[#004220]">
+                      </p>
+                      <p className="text-[#004220] font-semibold mt-1">
                         {selectedAssignment.materi?.judul || "-"}
                       </p>
                     </div>
 
-                    {/* Pertanyaan */}
-                    <div className="bg-white border border-gray-300 rounded-md p-5">
-                      <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3 block">
+                    <div className="rounded-2xl border p-4">
+                      <p className="text-xs font-semibold text-gray-500">
                         Pertanyaan
-                      </label>
-                      <p className="text-gray-800 leading-relaxed text-base">
+                      </p>
+                      <p className="text-gray-800 mt-2 leading-relaxed">
                         {selectedAssignment.pertanyaan}
                       </p>
                     </div>
 
-                    {/* Pilihan Jawaban */}
-                    <div>
-                      <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3 block">
-                        Pilih Jawaban Anda
-                      </label>
-                      <div className="space-y-3">
-                        {["A", "B", "C", "D"].map((option) => {
-                          const optionText = selectedAssignment[
-                            `opsi${option}` as keyof Assignment
-                          ] as string;
-                          const isSelected = selectedAnswer === option;
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-gray-500">
+                        Pilih jawaban
+                      </p>
 
-                          return (
-                            <button
-                              key={option}
-                              onClick={() => setSelectedAnswer(option)}
-                              className={`w-full flex items-start gap-3 p-4 rounded-md border-2 transition-all text-left ${
-                                isSelected
-                                  ? "bg-[#004220] border-[#004220] text-white"
-                                  : "bg-white border-gray-300 hover:border-[#004220]"
-                              }`}
-                            >
+                      {["A", "B", "C", "D"].map((opt) => {
+                        const isSelected = selectedAnswer === opt;
+                        return (
+                          <button
+                            key={opt}
+                            onClick={() => setSelectedAnswer(opt)}
+                            className={[
+                              "w-full text-left rounded-2xl border p-4 transition",
+                              isSelected
+                                ? "border-[#004220] bg-emerald-50"
+                                : "border-gray-200 bg-white hover:bg-gray-50",
+                            ].join(" ")}
+                          >
+                            <div className="flex items-start gap-3">
                               <div
-                                className={`flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center font-semibold text-sm ${
+                                className={[
+                                  "h-9 w-9 rounded-xl flex items-center justify-center font-bold text-sm shrink-0",
                                   isSelected
-                                    ? "bg-white text-[#004220]"
-                                    : "bg-gray-200 text-gray-700"
-                                }`}
+                                    ? "bg-[#004220] text-white"
+                                    : "bg-gray-100 text-gray-700",
+                                ].join(" ")}
                               >
-                                {option}
+                                {opt}
                               </div>
-                              <p
-                                className={`flex-1 pt-1 ${
-                                  isSelected ? "font-medium" : ""
-                                }`}
-                              >
-                                {optionText}
+                              <p className="text-gray-800 leading-relaxed">
+                                {optionText(selectedAssignment, opt)}
                               </p>
-                            </button>
-                          );
-                        })}
-                      </div>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 ) : (
-                  /* Quiz Result */
-                  <div className="text-center py-10">
+                  <div className="py-6 text-center">
                     {quizResult.isCorrect ? (
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         <div className="flex justify-center">
-                          <FaCheckCircle className="text-green-500 text-6xl" />
+                          <FaCheckCircle className="text-emerald-500 text-6xl" />
                         </div>
-                        <h3 className="text-2xl font-bold text-green-600">
-                          Jawaban Benar!
+                        <h3 className="text-2xl font-bold text-emerald-600">
+                          Jawaban Benar
                         </h3>
-                        <p className="text-gray-600">
-                          Selamat! Jawaban Anda benar.
+                        <p className="text-gray-600 text-sm">
+                          Mantap, jawaban kamu tepat.
                         </p>
                       </div>
                     ) : (
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         <div className="flex justify-center">
-                          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
-                            <span className="text-red-500 text-4xl font-bold">
-                              ✗
+                          <div className="h-16 w-16 bg-red-50 border border-red-100 rounded-full flex items-center justify-center">
+                            <span className="text-red-600 text-3xl font-bold">
+                              ×
                             </span>
                           </div>
                         </div>
                         <h3 className="text-2xl font-bold text-red-600">
                           Jawaban Salah
                         </h3>
-                        <p className="text-gray-600">
-                          Jawaban yang benar adalah:{" "}
+                        <p className="text-gray-600 text-sm">
+                          Jawaban benar:{" "}
                           <span className="font-bold text-[#004220]">
                             {quizResult.correctAnswer}
                           </span>
                         </p>
-                        <div className="bg-green-50 border border-green-300 rounded-md p-4 mt-4">
-                          <p className="text-sm text-gray-700">
-                            <strong>Jawaban Benar:</strong>{" "}
-                            {
-                              selectedAssignment[
-                                `opsi${quizResult.correctAnswer}` as keyof Assignment
-                              ] as string
-                            }
+
+                        <div className="mt-4 rounded-2xl bg-emerald-50 border border-emerald-100 p-4 text-left">
+                          <p className="text-xs font-semibold text-gray-500">
+                            Pembahasan (jawaban benar)
+                          </p>
+                          <p className="text-sm text-gray-800 mt-2 leading-relaxed">
+                            {optionText(
+                              selectedAssignment,
+                              quizResult.correctAnswer
+                            )}
                           </p>
                         </div>
                       </div>
@@ -494,28 +485,28 @@ export default function KerjakanAssignmentPage() {
                 )}
               </div>
 
-              {/* Footer */}
-              <div className="bg-gray-50 px-8 py-4 border-t border-gray-200 flex justify-end gap-3">
+              {/* modal footer */}
+              <div className="bg-gray-50 border-t px-5 sm:px-6 py-4 flex justify-end gap-2">
                 {!quizResult?.show ? (
                   <>
                     <button
                       onClick={handleCloseQuiz}
-                      className="px-5 py-2 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-medium rounded-md transition"
+                      className="px-4 py-2 rounded-xl bg-white border hover:bg-gray-100 transition"
                     >
                       Batal
                     </button>
                     <button
                       onClick={handleSubmitAnswer}
                       disabled={!selectedAnswer}
-                      className="px-5 py-2 bg-[#004220] hover:bg-[#003318] text-white font-medium rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-4 py-2 rounded-xl bg-[#004220] hover:bg-[#003318] text-white font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Submit Jawaban
+                      Submit
                     </button>
                   </>
                 ) : (
                   <button
                     onClick={handleCloseQuiz}
-                    className="px-5 py-2 bg-[#004220] hover:bg-[#003318] text-white font-medium rounded-md transition"
+                    className="px-4 py-2 rounded-xl bg-[#004220] hover:bg-[#003318] text-white font-semibold transition"
                   >
                     Tutup
                   </button>

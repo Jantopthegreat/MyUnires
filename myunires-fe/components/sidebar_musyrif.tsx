@@ -4,32 +4,31 @@ import {
   FiMenu,
   FiX,
   FiHome,
+  FiUsers,
+  FiAward,
   FiBarChart2,
   FiBookOpen,
   FiEdit3,
-  FiAward,
   FiLogOut,
 } from "react-icons/fi";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { clearAuth } from "@/lib/api";
 
 type Props = {
-  isOpen: boolean; // desktop: expanded vs mini
-  toggleSidebar: () => void; // desktop toggle
-  mobileOpen: boolean; // mobile drawer open
-  setMobileOpen: (v: boolean) => void;
+  isOpen: boolean;
+  toggleSidebar: () => void;
+  mobileOpen: boolean; // <- wajib
+  setMobileOpen: (v: boolean) => void; // <- wajib
 };
 
-interface UserData {
+type UserData = {
   id: number;
   name: string;
   email: string;
-  nim?: string;
-  jurusan?: string;
-  angkatan?: number;
-}
+};
 
-export default function Sidebar_Resident({
+export default function Sidebar({
   isOpen,
   toggleSidebar,
   mobileOpen,
@@ -41,35 +40,37 @@ export default function Sidebar_Resident({
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch user profile
+  // Fetch profile musyrif (pastikan backend ada GET /api/musyrif/profile)
   useEffect(() => {
-    const fetchUserData = async () => {
+    let active = true;
+
+    (async () => {
       try {
         const token = localStorage.getItem("token");
         if (!token) return;
 
-        const response = await fetch(
-          "http://localhost:3001/api/resident/profile",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const res = await fetch("http://localhost:3001/api/musyrif/profile", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-        const data = await response.json();
-        if (data?.success) setUserData(data.data);
-      } catch (error) {
-        console.error("Error fetching user data:", error);
+        const json = await res.json();
+        if (!active) return;
+        if (json?.success) setUserData(json.data);
+      } catch (e) {
+        // no-op
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
-    };
+    })();
 
-    fetchUserData();
+    return () => {
+      active = false;
+    };
   }, []);
 
   const initial = useMemo(() => {
     const name = userData?.name || "";
-    return name ? name.charAt(0).toUpperCase() : "?";
+    return name ? name.charAt(0).toUpperCase() : "M";
   }, [userData]);
 
   const menuItems = useMemo(
@@ -77,32 +78,22 @@ export default function Sidebar_Resident({
       {
         title: "Dashboard",
         icon: <FiHome size={18} />,
-        href: "/resident/dashboard",
+        href: "/pembina/dashboard",
+      },
+      {
+        title: "Data Resident",
+        icon: <FiUsers size={18} />,
+        href: "/pembina/dashboard/resident",
       },
       {
         title: "Nilai Tahfidz",
         icon: <FiAward size={18} />,
-        href: "/resident/nilaiTahfidz",
+        href: "/pembina/dashboard/tahfidz",
       },
       {
-        title: "Progres Hafalan",
-        icon: <FiBarChart2 size={18} />,
-        href: "/resident/progresHafalan",
-      },
-      {
-        title: "Materi Pembelajaran",
-        icon: <FiBookOpen size={18} />,
-        href: "/resident/MateriPembelajaran",
-      },
-      {
-        title: "Kerjakan Assignment",
+        title: "Buat Assignment",
         icon: <FiEdit3 size={18} />,
-        href: "/resident/kerjakanAssignment",
-      },
-      {
-        title: "Leaderboard",
-        icon: <FiAward size={18} />,
-        href: "/resident/leaderboard",
+        href: "/pembina/dashboard/assignment",
       },
     ],
     []
@@ -114,7 +105,7 @@ export default function Sidebar_Resident({
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
+    clearAuth(); // hapus token dll (punyamu)
     setMobileOpen(false);
     window.location.href = "/login";
   };
@@ -149,7 +140,7 @@ export default function Sidebar_Resident({
             ) : (
               <>
                 <p className="font-semibold text-sm text-[#004220] truncate">
-                  {userData?.name || "Resident"}
+                  {userData?.name || "Musyrif"}
                 </p>
                 <p className="text-xs text-[#004220]/80 truncate">
                   {userData?.email || ""}
@@ -166,7 +157,12 @@ export default function Sidebar_Resident({
     <nav className="mt-3">
       <ul className="space-y-1">
         {menuItems.map((item) => {
-          const active = pathname === item.href;
+          // biar nested route ikut ke-highlight
+          const active =
+            pathname === item.href ||
+            (item.href !== "/dashboard/musyrif" &&
+              pathname?.startsWith(item.href)); // startsWith pattern umum [web:1953]
+
           return (
             <li key={item.href}>
               <button
@@ -209,22 +205,19 @@ export default function Sidebar_Resident({
           <FiLogOut size={18} />
           {!compact && <span className="text-sm font-semibold">Logout</span>}
         </button>
-
-        {/* strip hijau bawah (biar konsisten branding) */}
       </div>
     </div>
   );
 
   return (
     <>
-      {/* ===== MOBILE DRAWER OVERLAY ===== */}
+      {/* ===== MOBILE DRAWER ===== */}
       <div
         className={[
           "fixed inset-0 z-[60] md:hidden transition",
           mobileOpen ? "pointer-events-auto" : "pointer-events-none",
         ].join(" ")}
       >
-        {/* backdrop */}
         <div
           onClick={() => setMobileOpen(false)}
           className={[
@@ -233,7 +226,6 @@ export default function Sidebar_Resident({
           ].join(" ")}
         />
 
-        {/* panel */}
         <aside
           className={[
             "absolute left-0 top-16 bottom-0 w-[280px] bg-white border-r shadow-xl",
@@ -244,7 +236,7 @@ export default function Sidebar_Resident({
           <div className="px-4 pt-4">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-[#004220]">
-                Menu Resident
+                Menu Musyrif
               </p>
               <button
                 onClick={() => setMobileOpen(false)}
@@ -265,7 +257,7 @@ export default function Sidebar_Resident({
         </aside>
       </div>
 
-      {/* ===== DESKTOP SIDEBAR (fixed) ===== */}
+      {/* ===== DESKTOP SIDEBAR ===== */}
       <aside
         className={[
           "hidden md:flex fixed top-16 left-0 bottom-0 z-20",
@@ -273,7 +265,6 @@ export default function Sidebar_Resident({
           isOpen ? "w-64" : "w-14",
         ].join(" ")}
       >
-        {/* toggle desktop collapse */}
         <div
           className={[
             "h-12 flex items-center",

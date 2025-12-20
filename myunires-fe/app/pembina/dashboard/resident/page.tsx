@@ -1,16 +1,15 @@
 "use client";
+
 import { useState } from "react";
-import Sidebar from "@/components/Sidebar";
+import Sidebar from "@/components/sidebar_musyrif";
 import ResidentFilterBar from "@/components/ResidentFilterBar";
-import ResidentTable from "@/components/ResidentTable";
 import { useResidentDataMusyrif } from "@/lib/hooks/useResidentDataMusyrif";
 import { showResidentDetail } from "@/lib/residentModal";
 import { handleExcelImport } from "@/lib/excelImport";
-import { clearAuth } from "@/lib/api";
 
 export default function ResidentPage() {
-  const [isOpen, setIsOpen] = useState(true);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isOpen, setIsOpen] = useState(true); // desktop collapse
+  const [mobileOpen, setMobileOpen] = useState(false); // mobile drawer
 
   const {
     residents,
@@ -32,81 +31,69 @@ export default function ResidentPage() {
   const handleImport = async (file: File) => {
     await handleExcelImport(file, refetchResidents);
   };
+
   return (
-    <div className="min-h-screen flex bg-white">
-      {/* ===== HEADER LOGO ===== */}
-      <header className="fixed top-0 left-0 right-0 bg-white z-30 h-16 flex items-center justify-between px-6 border-b">
+    <div className="min-h-screen bg-white">
+      {/* ===== HEADER LOGO (tanpa logout) ===== */}
+      <header className="fixed top-0 left-0 right-0 bg-white z-30 h-16 flex items-center justify-between px-4 sm:px-6 border-b">
         <div className="flex items-center gap-3">
-          <img src="/lg_umy.svg" alt="UMY" className="h-10 object-contain" />
+          {/* tombol buka sidebar khusus mobile */}
+          <button
+            type="button"
+            onClick={() => setMobileOpen(true)}
+            className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+            aria-label="Open menu"
+          >
+            {/* icon hamburger sederhana */}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M4 6h16M4 12h16M4 18h16"
+                stroke="#0D6B44"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+
+          <img
+            src="/lg_umy.svg"
+            alt="UMY"
+            className="h-9 sm:h-10 object-contain"
+          />
           <img
             src="/lg_unires.svg"
             alt="UNIRES"
-            className="h-10 object-contain"
+            className="h-9 sm:h-10 object-contain"
           />
         </div>
-        <button
-          onClick={() => setShowLogoutModal(true)}
-          className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-md transition"
-        >
-          Logout
-        </button>
+
+        {/* kanan kosong, karena logout pindah ke sidebar */}
+        <div className="w-10" />
       </header>
 
-      {/* ===== LOGOUT MODAL ===== */}
-      {showLogoutModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-white/90 z-50">
-          <div className="bg-[#d1d4d0] rounded-3xl shadow-lg p-8 w-[400px] text-center">
-            <h2 className="text-2xl font-semibold text-[#004220] mb-4">
-              Log Out
-            </h2>
-            <p className="text-gray-700 text-sm mb-1">
-              Tindakan ini akan mengakhiri sesi login Anda.
-            </p>
-            <p className="text-gray-700 text-sm mb-6">
-              Apakah Anda ingin melanjutkan?
-            </p>
-
-            <div className="flex justify-center gap-4">
-              <button
-                onClick={() => setShowLogoutModal(false)}
-                className="bg-[#FFC107] hover:bg-[#ffb300] text-white font-semibold px-6 py-2 rounded-full shadow-md"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  clearAuth();
-                  window.location.href = "/login";
-                }}
-                className="bg-[#E50914] hover:bg-red-700 text-white font-semibold px-6 py-2 rounded-full shadow-md"
-              >
-                Log Out
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===== SIDEBAR ===== */}
-      <Sidebar isOpen={isOpen} toggleSidebar={toggleSidebar} />
+      {/* ===== SIDEBAR (desktop + mobile drawer) ===== */}
+      <Sidebar
+        isOpen={isOpen}
+        toggleSidebar={() => setIsOpen((p) => !p)}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
+      />
 
       {/* ===== MAIN CONTENT ===== */}
       <main
-        className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
-          isOpen ? "ml-64" : "ml-12"
-        }`}
+        className={[
+          "pt-16 transition-all duration-300 ease-in-out",
+          // desktop: kasih margin sesuai sidebar; mobile: no margin
+          isOpen ? "md:ml-64" : "md:ml-12",
+        ].join(" ")}
       >
-        {/* Spacer supaya tidak ketabrak header */}
-        <div className="h-16" />
-
-        {/* Header hijau */}
-        <header className="px-6 py-4">
-          <h1 className="bg-[#004220] text-white text-center py-6 rounded-md text-lg font-semibold">
+        <header className="px-4 sm:px-6 py-4">
+          <h1 className="bg-[#004220] text-white text-center py-4 sm:py-6 rounded-md text-base sm:text-lg font-semibold">
             Daftar Nama Resident
           </h1>
         </header>
 
-        {/* ===== Filter Bar ===== */}
+        {/* Filter Bar */}
         <ResidentFilterBar
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
@@ -119,8 +106,8 @@ export default function ResidentPage() {
           onImport={handleImport}
         />
 
-        {/* ===== Table ===== */}
-        <section className="px-6 pb-6">
+        {/* Table */}
+        <section className="px-4 sm:px-6 pb-6">
           <div className="bg-white rounded-lg shadow border border-[#004220] overflow-hidden">
             {loading ? (
               <div className="text-center py-10 text-gray-500">
@@ -132,15 +119,25 @@ export default function ResidentPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <div className="max-h-[600px] overflow-y-auto">
+                <div className="max-h-[60vh] md:max-h-[600px] overflow-y-auto">
                   <table className="w-full text-sm border-collapse">
                     <thead className="text-[#004220] border-b border-[#004220] bg-white sticky top-0 z-10">
                       <tr>
-                        <th className="py-3 text-left px-4 bg-white">No</th>
-                        <th className="py-3 text-left px-4 bg-white">Nama</th>
-                        <th className="py-3 text-left px-4 bg-white">No. Unires</th>
-                        <th className="py-3 text-left px-4 bg-white">Usroh</th>
-                        <th className="py-3 text-center px-4 bg-white">Aksi</th>
+                        <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                          No
+                        </th>
+                        <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                          Nama
+                        </th>
+                        <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                          No. Unires
+                        </th>
+                        <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                          Usroh
+                        </th>
+                        <th className="py-3 text-center px-4 bg-white whitespace-nowrap">
+                          Aksi
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -149,15 +146,23 @@ export default function ResidentPage() {
                           key={resident.id}
                           className="text-[#004220] border-b border-[#004220] hover:bg-[#F7F9F8] transition"
                         >
-                          <td className="py-3 px-4">{i + 1}</td>
-                          <td className="py-3 px-4">{resident.name}</td>
-                          <td className="py-3 px-4">{resident.nim}</td>
-                          <td className="py-3 px-4">{resident.usroh || "-"}</td>
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            {i + 1}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            {resident.name}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            {resident.nim}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            {resident.usroh || "-"}
+                          </td>
                           <td className="py-3 px-4">
-                            <div className="flex gap-2 justify-center">
+                            <div className="flex justify-center">
                               <button
                                 onClick={() => showResidentDetail(resident)}
-                                className="flex items-center gap-2 bg-[#004220] text-white px-4 py-2 rounded-lg hover:bg-[#005a2c] transition text-xs font-semibold"
+                                className="bg-[#004220] text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-[#005a2c] transition text-xs font-semibold whitespace-nowrap"
                               >
                                 Lihat Detail
                               </button>
@@ -171,9 +176,10 @@ export default function ResidentPage() {
               </div>
             )}
           </div>
-          {/* Info jumlah data */}
+
           <div className="mt-3 text-sm text-gray-600">
-            Menampilkan {filteredResidents.length} dari {residents.length} resident
+            Menampilkan {filteredResidents.length} dari {residents.length}{" "}
+            resident
           </div>
         </section>
       </main>

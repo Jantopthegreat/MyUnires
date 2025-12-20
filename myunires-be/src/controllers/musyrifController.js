@@ -7,6 +7,36 @@ import xlsx from "xlsx";
 
    ========================================================== */
 
+
+   // ✅ Profile Musyrif (untuk Sidebar)
+export const getProfileMusyrif = async (req, res) => {
+  try {
+    // req.user.id dari verifyToken
+    const musyrif = await prisma.musyrif.findUnique({
+      where: { userId: req.user.id },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    if (!musyrif) {
+      return res.status(404).json({ success: false, message: "Profile musyrif tidak ditemukan." });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        id: musyrif.user.id,
+        name: musyrif.user.name,
+        email: musyrif.user.email,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Error getProfileMusyrif:", error);
+    return res.status(500).json({ success: false, message: "Terjadi kesalahan server." });
+  }
+};
+
 /**
  * ✅ Ambil semua resident (dengan filter opsional)
  * Hanya tampilkan resident di lantai yang dikelola musyrif

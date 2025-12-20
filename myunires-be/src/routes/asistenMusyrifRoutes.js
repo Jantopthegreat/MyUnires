@@ -16,6 +16,7 @@ import {
   updateAssignment,
   deleteAssignment,
   uploadAssignmentImage,
+  getTahfidzProgressByTargetAsisten
 } from "../controllers/asistenMusyrifController.js";
 import { verifyToken, isAsisten } from "../middlewares/authMiddleware.js";
 
@@ -43,6 +44,9 @@ const uploadAssignmentFile = multer({
   },
 });
 
+
+// ✅ Dashboard Tahfidz Progress
+router.get("/tahfidz/progress-target", verifyToken, isAsisten, getTahfidzProgressByTargetAsisten);
 // Resident binaan
 router.get("/residents", verifyToken, isAsisten, getResidentsByAsisten);
 

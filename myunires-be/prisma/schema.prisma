@@ -201,17 +201,20 @@ model SubTargets {
 }
 
 model NilaiTahfidz {
-  id              Int             @id @default(autoincrement())
-  soalImageUrl String?  // URL gambar soal (opsional)
-  residentId      Int
-  targetHafalanId Int
-  status          String
-  nilaiHuruf      String?
-  createdAt       DateTime        @default(now())
+  id              Int      @id @default(autoincrement())
+  soalImageUrl     String?
+  residentId       Int
+  targetHafalanId  Int
+  status           String
+  nilaiHuruf       String?
+  createdAt        DateTime @default(now())
 
-  resident        Resident        @relation(fields: [residentId], references: [id])
-  targetHafalan   TargetHafalan   @relation(fields: [targetHafalanId], references: [id])
+  resident      Resident     @relation(fields: [residentId], references: [id])
+  targetHafalan TargetHafalan @relation(fields: [targetHafalanId], references: [id])
+
+  @@unique([residentId, targetHafalanId])
 }
+
 
 
 

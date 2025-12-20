@@ -1,6 +1,8 @@
 "use client";
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useMemo } from "react";
 import { FaBook, FaArrowLeft } from "react-icons/fa";
+import { FiMenu } from "react-icons/fi";
 import Sidebar_Resident from "@/components/Sidebar_Resident";
 
 interface KategoriMateri {
@@ -18,18 +20,20 @@ interface Materi {
 }
 
 export default function MateriPembelajaranPage() {
+  // desktop collapse
   const [isOpen, setIsOpen] = useState(true);
   const toggleSidebar = () => setIsOpen((prev) => !prev);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  // mobile drawer
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const [kategoriList, setKategoriList] = useState<KategoriMateri[]>([]);
   const [materiList, setMateriList] = useState<Materi[]>([]);
   const [selectedKategori, setSelectedKategori] =
     useState<KategoriMateri | null>(null);
-  const [filteredMateri, setFilteredMateri] = useState<Materi[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch kategori list
+  // Fetch kategori + materi
   useEffect(() => {
     const fetchKategori = async () => {
       try {
@@ -44,14 +48,7 @@ export default function MateriPembelajaranPage() {
           }
         );
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
         const result = await response.json();
-        console.log("Kategori response:", result);
-
-        // Handle jika response adalah array atau object dengan property kategori atau data
         const data = result.data || result.kategori || result;
         setKategoriList(Array.isArray(data) ? data : []);
       } catch (error) {
@@ -73,14 +70,7 @@ export default function MateriPembelajaranPage() {
           }
         );
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
         const result = await response.json();
-        console.log("Materi response:", result);
-
-        // Handle jika response adalah array atau object dengan property materi atau data
         const data = result.data || result.materi || result;
         setMateriList(Array.isArray(data) ? data : []);
       } catch (error) {
@@ -95,206 +85,214 @@ export default function MateriPembelajaranPage() {
     fetchMateri();
   }, []);
 
-  // Filter materi by selected kategori
-  useEffect(() => {
-    if (selectedKategori) {
-      const filtered = materiList.filter(
-        (m) => m.kategoriId === selectedKategori.id
-      );
-      setFilteredMateri(filtered);
-    }
+  const filteredMateri = useMemo(() => {
+    if (!selectedKategori) return [];
+    return materiList.filter((m) => m.kategoriId === selectedKategori.id);
   }, [selectedKategori, materiList]);
 
-  const handleKategoriClick = (kategori: KategoriMateri) => {
-    setSelectedKategori(kategori);
-  };
-
-  const handleBackToKategori = () => {
-    setSelectedKategori(null);
-  };
-
   return (
-    <div className="min-h-screen flex bg-white">
-      {/* ===== HEADER LOGO ===== */}
-      <header className="fixed top-0 left-0 right-0 bg-white z-30 h-16 flex items-center justify-between px-6 border-b">
-        <div className="flex items-center gap-3">
-          <img src="/lg_umy.svg" alt="UMY" className="h-10 object-contain" />
-          <img
-            src="/lg_unires.svg"
-            alt="UNIRES"
-            className="h-10 object-contain"
-          />
-        </div>
-        <button
-          onClick={() => setShowLogoutModal(true)}
-          className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-md transition"
-        >
-          Logout
-        </button>
-      </header>
+    <div className="min-h-screen bg-[#F5F5F5]">
+      {/* HEADER (tanpa logout) */}
+      <header className="h-16 bg-white border-b flex items-center sticky top-0 z-30">
+        <div className="w-full px-4 sm:px-6 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+              aria-label="Open menu"
+            >
+              <FiMenu size={18} className="text-[#0D6B44]" />
+            </button>
 
-      {/* ===== LOGOUT MODAL ===== */}
-      {showLogoutModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-white/90 z-50">
-          <div className="bg-[#d1d4d0] rounded-3xl shadow-lg p-8 w-[400px] text-center">
-            <h2 className="text-2xl font-semibold text-[#004220] mb-4">
-              Log Out
-            </h2>
-            <p className="text-gray-700 text-sm mb-1">
-              Tindakan ini akan mengakhiri sesi login Anda.
-            </p>
-            <p className="text-gray-700 text-sm mb-6">
-              Apakah Anda ingin melanjutkan?
-            </p>
+            <img
+              src="/lg_umy.svg"
+              alt="UMY"
+              className="h-6 sm:h-8 w-auto shrink-0"
+            />
+            <img
+              src="/lg_unires.svg"
+              alt="UNIRES"
+              className="h-6 sm:h-8 w-auto shrink-0"
+            />
+          </div>
 
-            <div className="flex justify-center gap-4">
-              <button
-                onClick={() => setShowLogoutModal(false)}
-                className="bg-[#FFC107] hover:bg-[#ffb300] text-white font-semibold px-6 py-2 rounded-full shadow-md"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  localStorage.removeItem("token");
-                  window.location.href = "/login";
-                }}
-                className="bg-[#E50914] hover:bg-red-700 text-white font-semibold px-6 py-2 rounded-full shadow-md"
-              >
-                Log Out
-              </button>
-            </div>
+          <div className="text-right">
+            <p className="text-xs text-gray-500">Resident</p>
+            <p className="text-sm font-semibold text-[#004220] leading-tight">
+              Materi Pembelajaran
+            </p>
           </div>
         </div>
-      )}
+      </header>
 
-      {/* ===== SIDEBAR ===== */}
-      <Sidebar_Resident isOpen={isOpen} toggleSidebar={toggleSidebar} />
+      {/* SIDEBAR */}
+      <Sidebar_Resident
+        isOpen={isOpen}
+        toggleSidebar={toggleSidebar}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
+      />
 
-      {/* ===== MAIN CONTENT ===== */}
+      {/* MAIN */}
       <main
-        className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
-          isOpen ? "ml-64" : "ml-12"
-        }`}
+        className={[
+          "transition-all duration-300",
+          isOpen ? "md:pl-64" : "md:pl-14",
+        ].join(" ")}
       >
-        {/* Spacer supaya tidak ketabrak header */}
-        <div className="h-16" />
-
-        {/* Header hijau */}
-        <header className="px-6 py-4 mb-5">
-          <h1 className="bg-[#004220] text-white text-center py-6 rounded-md text-lg font-semibold">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-6">
+          {/* Title bar */}
+          <div className="bg-[#004220] text-white text-center py-5 rounded-2xl text-xl font-semibold shadow-sm">
             Materi Pembelajaran
-          </h1>
-        </header>
+          </div>
 
-        {/* ===== Content ===== */}
-        <section className="px-6 pb-6">
-          {loading ? (
-            <div className="flex justify-center items-center py-20">
-              <div className="text-gray-500">Memuat data...</div>
-            </div>
-          ) : !selectedKategori ? (
-            /* ===== Kategori List ===== */
-            <div className="px-6 py-4 mb-5 space-y-4">
-              {kategoriList.length === 0 ? (
-                <div className="text-center py-10">
-                  <p className="text-gray-500 mb-2">
-                    Tidak ada kategori materi tersedia
-                  </p>
-                  <p className="text-sm text-gray-400">
-                    Silakan cek koneksi atau hubungi administrator
-                  </p>
-                </div>
-              ) : (
-                kategoriList.map((kategori) => (
-                  <button
-                    key={kategori.id}
-                    onClick={() => handleKategoriClick(kategori)}
-                    className="w-full bg-white text-[#004220] text-center py-3 rounded-md text-lg font-semibold border border-[#004220] hover:bg-[#004220] hover:text-white transition-all duration-200"
-                  >
-                    {kategori.nama}
-                  </button>
-                ))
-              )}
-            </div>
-          ) : (
-            /* ===== Materi List ===== */
-            <div className="px-6 py-4">
-              {/* Back Button */}
-              <button
-                onClick={handleBackToKategori}
-                className="mb-5 flex items-center gap-2 text-[#004220] hover:text-[#003318] font-medium transition"
-              >
-                <FaArrowLeft />
-                Kembali ke Kategori
-              </button>
-
-              {/* Kategori Title */}
-              <div className="mb-5">
-                <h2 className="text-2xl font-bold text-[#004220] mb-2">
-                  {selectedKategori.nama}
-                </h2>
-                <p className="text-gray-600">
-                  {filteredMateri.length} materi tersedia
-                </p>
+          {/* Content */}
+          <section className="mt-6">
+            {loading ? (
+              <div className="bg-white rounded-2xl border shadow-sm py-16 text-center text-gray-500">
+                Memuat data...
               </div>
+            ) : !selectedKategori ? (
+              <>
+                {/* KATEGORI LIST */}
+                {kategoriList.length === 0 ? (
+                  <div className="bg-white rounded-2xl border shadow-sm py-12 text-center">
+                    <p className="text-gray-600 font-semibold">
+                      Tidak ada kategori materi
+                    </p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      Cek koneksi atau hubungi administrator.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {kategoriList.map((k) => (
+                      <button
+                        key={k.id}
+                        onClick={() => setSelectedKategori(k)}
+                        className="group text-left bg-white border rounded-2xl shadow-sm p-5 hover:shadow-md transition"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs text-gray-500">Kategori</p>
+                            <h3 className="text-[#004220] text-lg font-semibold mt-1">
+                              {k.nama}
+                            </h3>
+                            <p className="text-sm text-gray-500 mt-2">
+                              Lihat materi yang tersedia di kategori ini.
+                            </p>
+                          </div>
 
-              {/* Materi Cards */}
-              {filteredMateri.length === 0 ? (
-                <div className="text-center py-10 text-gray-500">
-                  Belum ada materi untuk kategori ini
+                          <div className="h-11 w-11 rounded-xl bg-emerald-50 ring-1 ring-emerald-100 flex items-center justify-center shrink-0">
+                            <FaBook className="text-[#0D6B44] text-lg" />
+                          </div>
+                        </div>
+
+                        <div className="mt-4 inline-flex items-center text-sm font-semibold text-[#0D6B44] group-hover:underline">
+                          Buka
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* BACK + HEADER KATEGORI */}
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <button
+                    onClick={() => setSelectedKategori(null)}
+                    className="inline-flex items-center gap-2 text-[#004220] hover:text-[#003318] font-semibold transition"
+                  >
+                    <FaArrowLeft />
+                    Kembali
+                  </button>
+
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">Kategori</p>
+                    <p className="text-base font-semibold text-[#004220]">
+                      {selectedKategori.nama}
+                    </p>
+                  </div>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {filteredMateri.map((materi) => (
-                    <div
-                      key={materi.id}
-                      className="bg-white border border-gray-300 rounded-lg p-5 hover:shadow-lg transition-all duration-200"
-                    >
-                      {/* Materi Icon & Title */}
-                      <div className="flex items-start gap-3 mb-3">
-                        <div className="bg-[#004220] p-3 rounded-md">
-                          <FaBook className="text-white text-xl" />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-[#004220] mb-1">
-                            {materi.judul}
-                          </h3>
-                          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                            {selectedKategori.nama}
-                          </span>
-                        </div>
-                      </div>
 
-                      {/* Materi Description */}
-                      <p className="text-gray-700 text-sm mb-4 leading-relaxed">
-                        {materi.deskripsi}
+                <div className="mt-4 bg-white rounded-2xl border shadow-sm p-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-xl font-bold text-[#004220]">
+                        {selectedKategori.nama}
+                      </h2>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {filteredMateri.length} materi tersedia
                       </p>
-
-                      {/* Download Button (if fileUrl exists) */}
-                      {materi.fileUrl && (
-                        <a
-                          href={materi.fileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-block w-full text-center bg-[#004220] hover:bg-[#003318] text-white font-medium py-2 px-4 rounded-md transition"
-                        >
-                          Lihat Materi
-                        </a>
-                      )}
-
-                      {!materi.fileUrl && (
-                        <div className="text-center text-gray-400 text-sm py-2">
-                          File materi belum tersedia
-                        </div>
-                      )}
                     </div>
-                  ))}
+
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 whitespace-nowrap">
+                      Materi
+                    </span>
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
-        </section>
+
+                {/* MATERI LIST */}
+                <div className="mt-4">
+                  {filteredMateri.length === 0 ? (
+                    <div className="bg-white rounded-2xl border shadow-sm py-12 text-center text-gray-500">
+                      Belum ada materi untuk kategori ini
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {filteredMateri.map((m) => (
+                        <div
+                          key={m.id}
+                          className="bg-white border rounded-2xl shadow-sm p-5 hover:shadow-md transition"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="h-11 w-11 rounded-xl bg-[#004220] flex items-center justify-center shrink-0">
+                              <FaBook className="text-white text-lg" />
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <h3 className="text-lg font-semibold text-[#004220] leading-snug">
+                                {m.judul}
+                              </h3>
+
+                              <div className="mt-1">
+                                <span className="text-[11px] text-gray-600 bg-gray-100 px-2 py-1 rounded-full">
+                                  {selectedKategori.nama}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <p className="text-gray-700 text-sm mt-4 leading-relaxed line-clamp-3">
+                            {m.deskripsi}
+                          </p>
+
+                          <div className="mt-5">
+                            {m.fileUrl ? (
+                              <a
+                                href={m.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex w-full items-center justify-center rounded-xl bg-[#004220] hover:bg-[#003318] text-white font-semibold py-2.5 transition"
+                              >
+                                Lihat Materi
+                              </a>
+                            ) : (
+                              <div className="text-center text-gray-400 text-sm py-2">
+                                File materi belum tersedia
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </section>
+        </div>
       </main>
     </div>
   );

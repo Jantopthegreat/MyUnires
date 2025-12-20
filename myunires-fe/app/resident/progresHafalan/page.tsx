@@ -1,7 +1,9 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import Sidebar_Resident from "@/components/Sidebar_Resident";
 import Swal from "sweetalert2";
+import { FiMenu } from "react-icons/fi";
 
 interface NilaiTahfidz {
   id: number;
@@ -38,14 +40,16 @@ const BULAN_NAMES = [
 ];
 
 export default function ProgresHafalanPage() {
+  // desktop collapse
   const [isOpen, setIsOpen] = useState(true);
   const toggleSidebar = () => setIsOpen((prev) => !prev);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  // mobile drawer
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const [progressData, setProgressData] = useState<ProgressBulan[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch data nilai tahfidz dan hitung progress per bulan
   useEffect(() => {
     const fetchProgressData = async () => {
       setLoading(true);
@@ -54,71 +58,45 @@ export default function ProgresHafalanPage() {
         const response = await fetch(
           "http://localhost:3001/api/resident/tahfidz/nilai",
           {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { Authorization: `Bearer ${token}` },
           }
         );
 
         const data = await response.json();
+        if (!data.success) throw new Error(data.message || "Gagal memuat data");
 
-        if (data.success) {
-          const nilaiList: NilaiTahfidz[] = data.data;
+        const nilaiList: NilaiTahfidz[] = data.data;
 
-          // Dapatkan bulan saat ini
-          const currentMonth = new Date().getMonth(); // 0-11
-          const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().getMonth(); // 0-11
+        const currentYear = new Date().getFullYear();
 
-          // Hitung progress per bulan berdasarkan createdAt
-          const progressPerBulan = BULAN_NAMES.map((namaBulan, index) => {
-            const bulanIndex = index; // 0 = Januari, 11 = Desember
-
-            // Filter nilai yang dibuat di bulan ini (dari tahun berjalan)
-            const nilaiDiBulanIni = nilaiList.filter((nilai) => {
-              const createdDate = new Date(nilai.createdAt);
-              return (
-                createdDate.getMonth() === bulanIndex &&
-                createdDate.getFullYear() === currentYear
-              );
-            });
-
-            const totalTarget = nilaiDiBulanIni.length;
-            const selesai = nilaiDiBulanIni.filter(
-              (n) => n.status === "SELESAI"
-            ).length;
-
-            const persen =
-              totalTarget > 0 ? Math.round((selesai / totalTarget) * 100) : 0;
-
-            return {
-              bulan: namaBulan,
-              persen,
-              selesai,
-              total: totalTarget,
-            };
+        const progressPerBulan = BULAN_NAMES.map((namaBulan, index) => {
+          const nilaiDiBulanIni = nilaiList.filter((nilai) => {
+            const createdDate = new Date(nilai.createdAt);
+            return (
+              createdDate.getMonth() === index &&
+              createdDate.getFullYear() === currentYear
+            );
           });
 
-          // Urutkan: bulan saat ini di atas, lalu bulan setelahnya sampai Desember, kemudian Januari sampai sebelum bulan saat ini
-          // Contoh: jika sekarang November (index 10), urutannya: Nov, Des, Jan, Feb, ..., Okt
-          const reorderedData: ProgressBulan[] = [];
+          const total = nilaiDiBulanIni.length;
+          const selesai = nilaiDiBulanIni.filter(
+            (n) => n.status === "SELESAI"
+          ).length;
+          const persen = total > 0 ? Math.round((selesai / total) * 100) : 0;
 
-          // Mulai dari bulan saat ini
-          reorderedData.push(progressPerBulan[currentMonth]);
+          return { bulan: namaBulan, persen, selesai, total };
+        });
 
-          // Lanjut dari bulan setelah bulan saat ini sampai Desember
-          for (let i = currentMonth + 1; i <= 11; i++) {
-            reorderedData.push(progressPerBulan[i]);
-          }
+        // reorder: current month first
+        const reordered: ProgressBulan[] = [];
+        reordered.push(progressPerBulan[currentMonth]);
+        for (let i = currentMonth + 1; i <= 11; i++)
+          reordered.push(progressPerBulan[i]);
+        for (let i = 0; i < currentMonth; i++)
+          reordered.push(progressPerBulan[i]);
 
-          // Lanjut dari Januari sampai sebelum bulan saat ini
-          for (let i = 0; i < currentMonth; i++) {
-            reorderedData.push(progressPerBulan[i]);
-          }
-
-          setProgressData(reorderedData);
-        } else {
-          throw new Error(data.message || "Gagal memuat data");
-        }
+        setProgressData(reordered);
       } catch (error: any) {
         console.error("Error fetching progress:", error);
         Swal.fire({
@@ -128,7 +106,6 @@ export default function ProgresHafalanPage() {
           confirmButtonColor: "#ef4444",
         });
 
-        // Set default data kosong
         setProgressData(
           BULAN_NAMES.map((bulan) => ({
             bulan,
@@ -145,116 +122,132 @@ export default function ProgresHafalanPage() {
     fetchProgressData();
   }, []);
 
-  const getBarStyle = (percent: number) => {
-    if (percent === 100) {
-      return { width: "100%", backgroundColor: "#B7CFC1" }; // hijau
-    } else if (percent > 0 && percent < 100) {
-      return { width: `${percent}%`, backgroundColor: "#F9E49A" }; // kuning
-    } else {
-      return { width: "100%", backgroundColor: "#F9B1B1" }; // merah untuk 0%
-    }
+  const barClass = (p: number) => {
+    if (p === 100) return "bg-emerald-500";
+    if (p > 0) return "bg-amber-400";
+    return "bg-red-400";
   };
 
   return (
-    <div className="min-h-screen flex bg-white">
-      {/* HEADER */}
-      <header className="fixed top-0 left-0 right-0 bg-white z-30 h-16 flex items-center justify-between px-6 border-b">
-        <div className="flex items-center gap-3">
-          <img src="/lg_umy.svg" alt="UMY" className="h-10 object-contain" />
-          <img
-            src="/lg_unires.svg"
-            alt="UNIRES"
-            className="h-10 object-contain"
-          />
-        </div>
-        <button
-          onClick={() => setShowLogoutModal(true)}
-          className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-md transition"
-        >
-          Logout
-        </button>
-      </header>
+    <div className="min-h-screen bg-[#F5F5F5]">
+      {/* HEADER (tanpa logout, karena logout ada di sidebar bawah) */}
+      <header className="h-16 bg-white border-b flex items-center sticky top-0 z-30">
+        <div className="w-full px-4 sm:px-6 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+              aria-label="Open menu"
+            >
+              <FiMenu size={18} className="text-[#0D6B44]" />
+            </button>
 
-      {/* ===== LOGOUT MODAL ===== */}
-      {showLogoutModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-white/90 z-50">
-          <div className="bg-[#d1d4d0] rounded-3xl shadow-lg p-8 w-[400px] text-center">
-            <h2 className="text-2xl font-semibold text-[#004220] mb-4">
-              Log Out
-            </h2>
-            <p className="text-gray-700 text-sm mb-1">
-              Tindakan ini akan mengakhiri sesi login Anda.
-            </p>
-            <p className="text-gray-700 text-sm mb-6">
-              Apakah Anda ingin melanjutkan?
-            </p>
+            <img
+              src="/lg_umy.svg"
+              alt="UMY"
+              className="h-6 sm:h-8 w-auto shrink-0"
+            />
+            <img
+              src="/lg_unires.svg"
+              alt="UNIRES"
+              className="h-6 sm:h-8 w-auto shrink-0"
+            />
+          </div>
 
-            <div className="flex justify-center gap-4">
-              <button
-                onClick={() => setShowLogoutModal(false)}
-                className="bg-[#FFC107] hover:bg-[#ffb300] text-white font-semibold px-6 py-2 rounded-full shadow-md"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  localStorage.removeItem("token");
-                  window.location.href = "/login";
-                }}
-                className="bg-[#E50914] hover:bg-red-700 text-white font-semibold px-6 py-2 rounded-full shadow-md"
-              >
-                Log Out
-              </button>
-            </div>
+          <div className="text-right">
+            <p className="text-xs text-gray-500">Resident</p>
+            <p className="text-sm font-semibold text-[#004220] leading-tight">
+              Progres Hafalan
+            </p>
           </div>
         </div>
-      )}
+      </header>
 
       {/* SIDEBAR */}
-      <Sidebar_Resident isOpen={isOpen} toggleSidebar={toggleSidebar} />
+      <Sidebar_Resident
+        isOpen={isOpen}
+        toggleSidebar={toggleSidebar}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
+      />
 
-      {/* MAIN */}
+      {/* MAIN (mobile normal, desktop ada padding-left mengikuti sidebar) */}
       <main
-        className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
-          isOpen ? "ml-64" : "ml-12"
-        }`}
+        className={[
+          "transition-all duration-300",
+          isOpen ? "md:pl-64" : "md:pl-14",
+        ].join(" ")}
       >
-        <div className="h-16" />
-
-        <header className="px-6 py-4 mb-5">
-          <h1 className="bg-[#004220] text-white text-center py-6 rounded-md text-lg font-semibold">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-6">
+          {/* Title bar */}
+          <div className="bg-[#004220] text-white text-center py-5 rounded-2xl text-xl font-semibold shadow-sm">
             Progres Hafalan
-          </h1>
-        </header>
+          </div>
 
-        <section className="px-6 pb-10">
-          {loading ? (
-            <div className="text-center py-20 text-gray-500">
-              Memuat data progres...
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-x-20 gap-y-2">
-              {progressData.map((item, i) => (
-                <div key={i}>
-                  <p className="text-[#004220] text-sm font-medium mb-1">
-                    Target Bulan {item.bulan}
-                  </p>
+          {/* Content */}
+          <section className="mt-6">
+            {loading ? (
+              <div className="bg-white rounded-2xl border shadow-sm py-16 text-center text-gray-500">
+                Memuat data progres...
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {progressData.map((item, i) => (
+                  <div
+                    key={i}
+                    className="bg-white rounded-2xl border shadow-sm p-5"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs text-gray-500">Target Bulan</p>
+                        <p className="text-[#004220] text-base font-semibold">
+                          {item.bulan}
+                        </p>
+                      </div>
 
-                  <div className="w-full h-4 rounded-full bg-gray-200 border border-gray-300 overflow-hidden">
-                    <div
-                      className="h-full transition-all duration-700"
-                      style={getBarStyle(item.persen)}
-                    ></div>
+                      <span
+                        className={[
+                          "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap",
+                          item.persen === 100
+                            ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
+                            : item.persen > 0
+                            ? "bg-amber-50 text-amber-800 ring-1 ring-amber-100"
+                            : "bg-red-50 text-red-700 ring-1 ring-red-100",
+                        ].join(" ")}
+                      >
+                        {item.persen}%
+                      </span>
+                    </div>
+
+                    <div className="mt-4">
+                      <div className="h-3 rounded-full bg-gray-100 overflow-hidden">
+                        <div
+                          className={[
+                            "h-3 rounded-full transition-all duration-700",
+                            barClass(item.persen),
+                          ].join(" ")}
+                          style={{ width: `${item.persen}%` }}
+                        />
+                      </div>
+
+                      <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+                        <span>Selesai</span>
+                        <span className="tabular-nums">
+                          {item.selesai}/{item.total}
+                        </span>
+                      </div>
+
+                      <p className="mt-3 text-[11px] text-gray-400 leading-relaxed">
+                        Persentase dihitung dari total target pada bulan
+                        tersebut di tahun berjalan.
+                      </p>
+                    </div>
                   </div>
-
-                  <p className="text-xs text-gray-600 mt-0.5 text-right">
-                    {item.persen}% ({item.selesai}/{item.total})
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
       </main>
     </div>
   );

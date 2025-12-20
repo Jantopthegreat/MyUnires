@@ -6,7 +6,14 @@ import Swal from "sweetalert2";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/lib/useAuth";
-import { getUser, clearAuth, apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
+import {
+  getUser,
+  clearAuth,
+  apiGet,
+  apiPost,
+  apiPut,
+  apiDelete,
+} from "@/lib/api";
 import AdminSidebar from "@/components/adminSidebar";
 
 const ALLOWED_ROLES = ["ADMIN"];
@@ -33,6 +40,7 @@ type SubTarget = {
     ayatMulai?: number;
     ayatAkhir?: number;
   };
+  createdAt?: string;
 };
 
 export default function AdminSubTargetPage() {
@@ -50,14 +58,27 @@ export default function AdminSubTargetPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTargetId, setSelectedTargetId] = useState<string>("all");
 
-  // modal
+  // Detail modal
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [detailSubTarget, setDetailSubTarget] = useState<SubTarget | null>(
+    null
+  );
+
+  const openDetailModal = (s: SubTarget) => {
+    setDetailSubTarget(s);
+    setShowDetailModal(true);
+  };
+
+  // modal add/edit
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<"add" | "edit">("add");
-  const [selectedSubTarget, setSelectedSubTarget] = useState<SubTarget | null>(null);
+  const [selectedSubTarget, setSelectedSubTarget] = useState<SubTarget | null>(
+    null
+  );
 
   // form
   const [formNama, setFormNama] = useState("");
-  const [formTargetId, setFormTargetId] = useState<string>(""); // simpan string untuk <select>
+  const [formTargetId, setFormTargetId] = useState<string>("");
 
   const didFetch = useRef(false);
 
@@ -73,17 +94,31 @@ export default function AdminSubTargetPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [resSub, resTarget] = await Promise.all([apiGet<any>(SUBTARGET_URL), apiGet<any>(TARGET_URL)]);
+      const [resSub, resTarget] = await Promise.all([
+        apiGet<any>(SUBTARGET_URL),
+        apiGet<any>(TARGET_URL),
+      ]);
+
       setSubTargets(Array.isArray(resSub.data) ? resSub.data : []);
       setTargets(Array.isArray(resTarget.data) ? resTarget.data : []);
-    } catch (e) {
-      Swal.fire({ icon: "error", title: "Error", text: "Gagal memuat data sub target." });
+    } catch {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Gagal memuat data sub target.",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const targetLabel = (t: TargetHafalan) => `${t.nama} - ${t.surah} ${t.ayatMulai}–${t.ayatAkhir}`;
+  const handleLogout = () => {
+    clearAuth();
+    router.push("/login");
+  };
+
+  const targetLabel = (t: TargetHafalan) =>
+    `${t.nama} - ${t.surah} ${t.ayatMulai}–${t.ayatAkhir}`;
 
   const filtered = useMemo(() => {
     let result = [...subTargets];
@@ -106,11 +141,6 @@ export default function AdminSubTargetPage() {
     return result;
   }, [subTargets, searchTerm, selectedTargetId]);
 
-  const handleLogout = () => {
-    clearAuth();
-    router.push("/login");
-  };
-
   const openAddModal = () => {
     setModalMode("add");
     setSelectedSubTarget(null);
@@ -129,7 +159,11 @@ export default function AdminSubTargetPage() {
 
   const handleSave = async () => {
     if (!formNama.trim() || !formTargetId) {
-      Swal.fire({ icon: "error", title: "Validasi", text: "Nama sub target dan target wajib diisi." });
+      Swal.fire({
+        icon: "error",
+        title: "Validasi",
+        text: "Nama sub target dan target wajib diisi.",
+      });
       return;
     }
 
@@ -138,19 +172,42 @@ export default function AdminSubTargetPage() {
       targetId: Number(formTargetId),
     };
 
+    if (Number.isNaN(payload.targetId) || payload.targetId <= 0) {
+      Swal.fire({
+        icon: "error",
+        title: "Validasi",
+        text: "Target tidak valid.",
+      });
+      return;
+    }
+
     try {
       if (modalMode === "add") {
         await apiPost(SUBTARGET_URL, payload);
-        Swal.fire({ icon: "success", title: "Berhasil!", text: "Sub target ditambahkan.", timer: 1500 });
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil!",
+          text: "Sub target ditambahkan.",
+          timer: 1500,
+        });
       } else if (selectedSubTarget) {
         await apiPut(`${SUBTARGET_URL}/${selectedSubTarget.id}`, payload);
-        Swal.fire({ icon: "success", title: "Berhasil!", text: "Sub target diupdate.", timer: 1500 });
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil!",
+          text: "Sub target diupdate.",
+          timer: 1500,
+        });
       }
 
       setShowModal(false);
       fetchData();
     } catch (err: any) {
-      Swal.fire({ icon: "error", title: "Gagal", text: err?.message || "Terjadi kesalahan." });
+      Swal.fire({
+        icon: "error",
+        title: "Gagal",
+        text: err?.message || "Terjadi kesalahan.",
+      });
     }
   };
 
@@ -170,10 +227,23 @@ export default function AdminSubTargetPage() {
 
     try {
       await apiDelete(`${SUBTARGET_URL}/${s.id}`);
-      Swal.fire({ icon: "success", title: "Terhapus!", text: "Sub target berhasil dihapus.", timer: 1500 });
+      Swal.fire({
+        icon: "success",
+        title: "Terhapus!",
+        text: "Sub target berhasil dihapus.",
+        timer: 1500,
+      });
+
+      setShowDetailModal(false);
+      setDetailSubTarget(null);
+
       fetchData();
-    } catch (e) {
-      Swal.fire({ icon: "error", title: "Error", text: "Gagal menghapus sub target." });
+    } catch {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Gagal menghapus sub target.",
+      });
     }
   };
 
@@ -188,21 +258,16 @@ export default function AdminSubTargetPage() {
             <img src="/lg_umy.svg" alt="UMY" className="h-8" />
             <img src="/lg_unires.svg" alt="UNIRES" className="h-8" />
           </div>
-
-          <button
-            onClick={() => setShowLogoutModal(true)}
-            className="bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2 rounded-full text-xs shadow transition"
-          >
-            Log Out
-          </button>
         </div>
       </header>
 
       {/* Logout modal */}
       {showLogoutModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl p-8 w-[360px] text-center">
-            <h2 className="text-xl font-semibold text-[#004220] mb-3">Log Out</h2>
+        <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 w-full max-w-sm text-center">
+            <h2 className="text-xl font-semibold text-[#004220] mb-3">
+              Log Out
+            </h2>
             <p className="text-gray-600 text-sm mb-6">Akhiri sesi login?</p>
             <div className="flex justify-center gap-3">
               <button
@@ -211,7 +276,10 @@ export default function AdminSubTargetPage() {
               >
                 Batal
               </button>
-              <button onClick={handleLogout} className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg">
+              <button
+                onClick={handleLogout}
+                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"
+              >
                 Log Out
               </button>
             </div>
@@ -220,8 +288,12 @@ export default function AdminSubTargetPage() {
       )}
 
       {/* BODY */}
-      <div className="mx-auto max-w-7xl px-6 py-6 flex gap-6">
-        <AdminSidebar userName={userData?.name} userEmail={userData?.email} />
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 py-4 sm:py-6 flex flex-col md:flex-row gap-4 md:gap-6">
+        <AdminSidebar
+          userName={userData?.name}
+          userEmail={userData?.email}
+          onLogoutClick={() => setShowLogoutModal(true)}
+        />
 
         <main className="flex-1 min-w-0">
           <div className="bg-[#004220] text-white text-center py-5 rounded-2xl text-xl font-semibold shadow-sm">
@@ -229,23 +301,26 @@ export default function AdminSubTargetPage() {
           </div>
 
           {/* Filter bar + Add */}
-          <div className="mt-6 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+          <div className="mt-6 flex items-center justify-between gap-4 max-sm:flex-col max-sm:items-stretch">
+            <div className="flex items-center gap-3 max-sm:w-full max-sm:flex-col max-sm:items-stretch">
+              <div className="relative max-sm:w-full">
+                <FaSearch
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  size={14}
+                />
                 <input
                   type="text"
                   placeholder="Cari Sub Target"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 pr-3 py-2 border rounded-lg text-sm w-64"
+                  className="pl-9 pr-3 py-2 border rounded-lg text-sm w-64 max-sm:w-full"
                 />
               </div>
 
               <select
                 value={selectedTargetId}
                 onChange={(e) => setSelectedTargetId(e.target.value)}
-                className="px-3 py-2 border rounded-lg text-sm"
+                className="px-3 py-2 border rounded-lg text-sm max-sm:w-full"
               >
                 <option value="all">Target (All)</option>
                 {targets.map((t) => (
@@ -254,29 +329,32 @@ export default function AdminSubTargetPage() {
                   </option>
                 ))}
               </select>
-
-              {/* Import Data (nanti) */}
-              {/* <button className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">Import Data</button> */}
             </div>
 
-            <button
-              onClick={openAddModal}
-              className="bg-[#16a34a] hover:bg-[#15803d] text-white px-5 py-2 rounded-full flex items-center shadow-sm transition font-semibold text-sm"
-            >
-              <FaPlus className="mr-2" /> Add SubTarget
-            </button>
+            <div className="flex items-center gap-3 max-sm:w-full max-sm:justify-end">
+              <button
+                onClick={openAddModal}
+                className="bg-[#16a34a] hover:bg-[#15803d] text-white px-5 py-2 rounded-full flex items-center shadow-sm transition font-semibold text-sm max-sm:px-3 max-sm:text-xs"
+              >
+                <FaPlus className="mr-2" /> Add SubTarget
+              </button>
+            </div>
           </div>
 
           {/* Table */}
           <section className="mt-6 bg-white rounded-2xl shadow-sm border overflow-hidden">
             {loading && subTargets.length === 0 ? (
-              <div className="text-center py-10 text-gray-500">Memuat data...</div>
+              <div className="text-center py-10 text-gray-500">
+                Memuat data...
+              </div>
             ) : filtered.length === 0 ? (
-              <div className="text-center py-10 text-gray-500">Tidak ada data sub target</div>
+              <div className="text-center py-10 text-gray-500">
+                Tidak ada data sub target
+              </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b">
+                  <thead className="bg-gray-50 border-b sticky top-0 z-10">
                     <tr>
                       <th className="py-3 px-4 text-left">No</th>
                       <th className="py-3 px-4 text-left">Sub Target</th>
@@ -292,15 +370,36 @@ export default function AdminSubTargetPage() {
                         <td className="py-3 px-4">
                           {s.targetHafalan
                             ? `${s.targetHafalan.nama} - ${s.targetHafalan.surah}`
-                            : "(relasi kosong)"}
+                            : "-"}
                         </td>
-                        <td className="py-3 px-4 text-center">
-                          <button onClick={() => openEditModal(s)} className="text-blue-600 hover:underline mr-3">
-                            Edit
-                          </button>
-                          <button onClick={() => handleDelete(s)} className="text-red-600 hover:underline">
-                            Hapus
-                          </button>
+                        <td className="py-3 px-4">
+                          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
+                            <button
+                              onClick={() => openDetailModal(s)}
+                              className="hover:opacity-80"
+                              title="Detail"
+                            >
+                              <img
+                                src="/eye_icon.svg"
+                                alt="Detail"
+                                className="w-5 h-5 shrink-0"
+                              />
+                            </button>
+
+                            <button
+                              onClick={() => openEditModal(s)}
+                              className="text-blue-600 hover:underline"
+                            >
+                              Edit
+                            </button>
+
+                            <button
+                              onClick={() => handleDelete(s)}
+                              className="text-red-600 hover:underline"
+                            >
+                              Hapus
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -316,11 +415,91 @@ export default function AdminSubTargetPage() {
         </main>
       </div>
 
+      {/* Detail Modal */}
+      {showDetailModal && detailSubTarget && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Detail Sub Target</h2>
+              <button
+                onClick={() => {
+                  setShowDetailModal(false);
+                  setDetailSubTarget(null);
+                }}
+                className="text-sm text-gray-600 hover:underline"
+              >
+                Tutup
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="col-span-2">
+                <div className="text-gray-500">Nama Sub Target</div>
+                <div className="font-medium wrap-anywhere">
+                  {detailSubTarget.nama || "-"}
+                </div>
+              </div>
+
+              <div className="col-span-2">
+                <div className="text-gray-500">Target</div>
+                <div className="font-medium wrap-anywhere">
+                  {detailSubTarget.targetHafalan
+                    ? `${detailSubTarget.targetHafalan.nama} - ${detailSubTarget.targetHafalan.surah}`
+                    : "-"}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-gray-500">Ayat Mulai</div>
+                <div className="font-medium">
+                  {detailSubTarget.targetHafalan?.ayatMulai ?? "-"}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-gray-500">Ayat Akhir</div>
+                <div className="font-medium">
+                  {detailSubTarget.targetHafalan?.ayatAkhir ?? "-"}
+                </div>
+              </div>
+
+              <div className="col-span-2">
+                <div className="text-gray-500">Created At</div>
+                <div className="font-medium wrap-anywhere">
+                  {detailSubTarget.createdAt || "-"}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowDetailModal(false);
+                  openEditModal(detailSubTarget);
+                }}
+                className="px-4 py-2 border rounded-lg hover:bg-gray-50 text-blue-700 border-blue-200"
+              >
+                Edit
+              </button>
+
+              <button
+                onClick={() => handleDelete(detailSubTarget)}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Hapus
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Add/Edit */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-semibold mb-4">{modalMode === "add" ? "Tambah Sub Target" : "Edit Sub Target"}</h2>
+            <h2 className="text-lg font-semibold mb-4">
+              {modalMode === "add" ? "Tambah Sub Target" : "Edit Sub Target"}
+            </h2>
 
             <div className="space-y-3">
               <div>
@@ -356,10 +535,16 @@ export default function AdminSubTargetPage() {
             </div>
 
             <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => setShowModal(false)} className="px-4 py-2 border rounded-lg hover:bg-gray-50">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+              >
                 Batal
               </button>
-              <button onClick={handleSave} className="px-4 py-2 bg-[#004220] text-white rounded-lg hover:bg-[#003318]">
+              <button
+                onClick={handleSave}
+                className="px-4 py-2 bg-[#004220] text-white rounded-lg hover:bg-[#003318]"
+              >
                 Simpan
               </button>
             </div>

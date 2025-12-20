@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Sidebar_Resident from "@/components/Sidebar_Resident";
 import {
   FaMedal,
   FaSearch,
-  FaUserCircle,
   FaTrophy,
   FaBook,
   FaClipboardCheck,
 } from "react-icons/fa";
+import { FiMenu } from "react-icons/fi";
 
 interface LeaderboardData {
   id: number;
@@ -23,19 +23,21 @@ interface LeaderboardData {
 }
 
 export default function LeaderboardPage() {
+  // desktop collapse
   const [isOpen, setIsOpen] = useState(true);
   const toggleSidebar = () => setIsOpen((prev) => !prev);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  // mobile drawer
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardData[]>([]);
-  const [filteredData, setFilteredData] = useState<LeaderboardData[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<
     "all" | "hafalan" | "assignment"
   >("all");
 
-  // Fetch leaderboard data
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
@@ -50,17 +52,14 @@ export default function LeaderboardPage() {
           }
         );
 
-        if (!response.ok)
-          throw new Error(`HTTP error! status: ${response.status}`);
-
         const result = await response.json();
         const data = result.data || result.leaderboard || result;
-        setLeaderboardData(Array.isArray(data) ? data : []);
-        setFilteredData(Array.isArray(data) ? data : []);
+        const arr = Array.isArray(data) ? data : [];
+
+        setLeaderboardData(arr);
       } catch (error) {
         console.error("Error fetching leaderboard:", error);
         setLeaderboardData([]);
-        setFilteredData([]);
       } finally {
         setLoading(false);
       }
@@ -69,223 +68,240 @@ export default function LeaderboardPage() {
     fetchLeaderboard();
   }, []);
 
-  // Filter and search
-  useEffect(() => {
+  const filteredData = useMemo(() => {
     let filtered = [...leaderboardData];
 
-    // Apply filter type
+    // sort by selected metric (only if not all)
     if (filterType === "hafalan") {
       filtered.sort((a, b) => b.hafalanSelesai - a.hafalanSelesai);
     } else if (filterType === "assignment") {
       filtered.sort((a, b) => b.assignmentBenar - a.assignmentBenar);
+    } else {
+      // default: rank ascending
+      filtered.sort((a, b) => a.rank - b.rank);
     }
 
-    // Apply search
-    if (searchQuery) {
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (item) =>
-          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.nim.toLowerCase().includes(searchQuery.toLowerCase())
+          item.name.toLowerCase().includes(q) ||
+          item.nim.toLowerCase().includes(q)
       );
     }
 
-    setFilteredData(filtered);
-  }, [searchQuery, filterType, leaderboardData]);
+    return filtered;
+  }, [leaderboardData, searchQuery, filterType]);
 
-  const getMedalColor = (rank: number) => {
+  const top3 = useMemo(() => filteredData.slice(0, 3), [filteredData]);
+
+  const medalColor = (rank: number) => {
     if (rank === 1) return "text-yellow-500";
     if (rank === 2) return "text-gray-400";
-    if (rank === 3) return "text-amber-700";
-    return "";
-  };
-
-  const getProfileColor = (rank: number) => {
-    if (rank === 1) return "text-yellow-400";
-    if (rank === 2) return "text-gray-300";
     if (rank === 3) return "text-amber-700";
     return "text-gray-400";
   };
 
+  const pill = (active: boolean) =>
+    active
+      ? "bg-[#004220] text-white"
+      : "bg-gray-100 text-gray-700 hover:bg-gray-200";
+
   return (
-    <div className="min-h-screen flex bg-white">
-      {/* ===== HEADER LOGO ===== */}
-      <header className="fixed top-0 left-0 right-0 bg-white z-30 h-16 flex items-center justify-between px-6 border-b">
-        <div className="flex items-center gap-3">
-          <img src="/lg_umy.svg" alt="UMY" className="h-10 object-contain" />
-          <img
-            src="/lg_unires.svg"
-            alt="UNIRES"
-            className="h-10 object-contain"
-          />
+    <div className="min-h-screen bg-[#F5F5F5]">
+      {/* HEADER (tanpa logout) */}
+      <header className="h-16 bg-white border-b flex items-center sticky top-0 z-30">
+        <div className="w-full px-4 sm:px-6 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+              aria-label="Open menu"
+            >
+              <FiMenu size={18} className="text-[#0D6B44]" />
+            </button>
+
+            <img
+              src="/lg_umy.svg"
+              alt="UMY"
+              className="h-6 sm:h-8 w-auto shrink-0"
+            />
+            <img
+              src="/lg_unires.svg"
+              alt="UNIRES"
+              className="h-6 sm:h-8 w-auto shrink-0"
+            />
+          </div>
+
+          <div className="text-right">
+            <p className="text-xs text-gray-500">Resident</p>
+            <p className="text-sm font-semibold text-[#004220] leading-tight">
+              Leaderboard
+            </p>
+          </div>
         </div>
-        <button
-          onClick={() => setShowLogoutModal(true)}
-          className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-md transition"
-        >
-          Logout
-        </button>
       </header>
 
-      {/* ===== LOGOUT MODAL ===== */}
-      {showLogoutModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-white/90 z-50">
-          <div className="bg-[#d1d4d0] rounded-3xl shadow-lg p-8 w-[400px] text-center">
-            <h2 className="text-2xl font-semibold text-[#004220] mb-4">
-              Log Out
-            </h2>
-            <p className="text-gray-700 text-sm mb-1">
-              Tindakan ini akan mengakhiri sesi login Anda.
-            </p>
-            <p className="text-gray-700 text-sm mb-6">
-              Apakah Anda ingin melanjutkan?
-            </p>
+      {/* SIDEBAR */}
+      <Sidebar_Resident
+        isOpen={isOpen}
+        toggleSidebar={toggleSidebar}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
+      />
 
-            <div className="flex justify-center gap-4">
-              <button
-                onClick={() => setShowLogoutModal(false)}
-                className="bg-[#FFC107] hover:bg-[#ffb300] text-white font-semibold px-6 py-2 rounded-full shadow-md"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  localStorage.removeItem("token");
-                  window.location.href = "/login";
-                }}
-                className="bg-[#E50914] hover:bg-red-700 text-white font-semibold px-6 py-2 rounded-full shadow-md"
-              >
-                Log Out
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===== SIDEBAR ===== */}
-      <Sidebar_Resident isOpen={isOpen} toggleSidebar={toggleSidebar} />
-
-      {/* ===== MAIN CONTENT ===== */}
+      {/* MAIN */}
       <main
-        className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
-          isOpen ? "ml-64" : "ml-12"
-        }`}
+        className={[
+          "transition-all duration-300",
+          isOpen ? "md:pl-64" : "md:pl-14",
+        ].join(" ")}
       >
-        <div className="h-16" /> {/* Spacer supaya tidak ketabrak header */}
-        {/* ===== HEADER HIJAU ===== */}
-        <header className="px-6 py-4">
-          <h1 className="bg-[#004220] text-white text-center py-4 rounded-md text-lg font-semibold shadow-sm">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-6">
+          {/* Title bar */}
+          <div className="bg-[#004220] text-white text-center py-5 rounded-2xl text-xl font-semibold shadow-sm">
             Leaderboard
-          </h1>
-        </header>
-        {/* ===== FILTER TABS ===== */}
-        <div className="px-6 py-4">
-          <div className="flex gap-2 justify-center">
-            <button
-              onClick={() => setFilterType("all")}
-              className={`px-4 py-2 rounded-md font-medium transition ${
-                filterType === "all"
-                  ? "bg-[#004220] text-white"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
-            >
-              <FaTrophy className="inline mr-2" />
-              Semua
-            </button>
-            <button
-              onClick={() => setFilterType("hafalan")}
-              className={`px-4 py-2 rounded-md font-medium transition ${
-                filterType === "hafalan"
-                  ? "bg-[#004220] text-white"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
-            >
-              <FaBook className="inline mr-2" />
-              Hafalan
-            </button>
-            <button
-              onClick={() => setFilterType("assignment")}
-              className={`px-4 py-2 rounded-md font-medium transition ${
-                filterType === "assignment"
-                  ? "bg-[#004220] text-white"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
-            >
-              <FaClipboardCheck className="inline mr-2" />
-              Assignment
-            </button>
           </div>
-        </div>
-        {/* ===== KONTEN ===== */}
-        <section className="flex flex-col items-center justify-center px-6 space-y-8 mb-10">
-          {loading ? (
-            <div className="flex justify-center items-center py-20">
-              <div className="text-gray-500">Memuat data...</div>
+
+          {/* Filters + Search */}
+          <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* tabs */}
+            <div className="bg-white rounded-2xl border shadow-sm p-4">
+              <p className="text-xs text-gray-500 mb-3">Filter</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setFilterType("all")}
+                  className={[
+                    "px-4 py-2 rounded-xl text-sm font-semibold transition inline-flex items-center gap-2",
+                    pill(filterType === "all"),
+                  ].join(" ")}
+                >
+                  <FaTrophy />
+                  Semua
+                </button>
+                <button
+                  onClick={() => setFilterType("hafalan")}
+                  className={[
+                    "px-4 py-2 rounded-xl text-sm font-semibold transition inline-flex items-center gap-2",
+                    pill(filterType === "hafalan"),
+                  ].join(" ")}
+                >
+                  <FaBook />
+                  Hafalan
+                </button>
+                <button
+                  onClick={() => setFilterType("assignment")}
+                  className={[
+                    "px-4 py-2 rounded-xl text-sm font-semibold transition inline-flex items-center gap-2",
+                    pill(filterType === "assignment"),
+                  ].join(" ")}
+                >
+                  <FaClipboardCheck />
+                  Assignment
+                </button>
+              </div>
             </div>
-          ) : (
-            <>
-              {/* === Kartu Progres Terbaik (Top 3) === */}
-              {filteredData.length >= 3 && (
-                <div className="w-full max-w-5xl">
-                  <div className="bg-[#004220] text-white text-center py-3 rounded-t-lg font-semibold">
-                    🏆 Top 3 Leaderboard 🏆
-                  </div>
-                  <div className="bg-gradient-to-br from-yellow-50 to-orange-50 p-6 rounded-b-lg shadow-lg">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {filteredData.slice(0, 3).map((item) => (
+
+            {/* search */}
+            <div className="lg:col-span-2 bg-white rounded-2xl border shadow-sm p-4">
+              <p className="text-xs text-gray-500 mb-3">Cari resident</p>
+              <div className="relative">
+                <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Cari nama atau NIM..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-12 pr-12 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#004220]/30 focus:border-[#004220] transition"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 font-bold"
+                    aria-label="Clear"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              {searchQuery && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Ditemukan {filteredData.length} hasil untuk "{searchQuery}"
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* CONTENT */}
+          <section className="mt-6">
+            {loading ? (
+              <div className="bg-white rounded-2xl border shadow-sm py-16 text-center text-gray-500">
+                Memuat data...
+              </div>
+            ) : filteredData.length === 0 ? (
+              <div className="bg-white rounded-2xl border shadow-sm py-12 text-center text-gray-500">
+                <p className="mb-2">Tidak ada data yang ditemukan</p>
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="text-[#004220] hover:underline text-sm"
+                  >
+                    Reset pencarian
+                  </button>
+                )}
+              </div>
+            ) : (
+              <>
+                {/* TOP 3 */}
+                {top3.length >= 3 && (
+                  <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                    <div className="bg-[#004220] text-white px-5 py-4 font-semibold">
+                      Top 3 Leaderboard
+                    </div>
+
+                    <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4 bg-gradient-to-br from-yellow-50 to-orange-50">
+                      {top3.map((item) => (
                         <div
                           key={item.id}
-                          className="bg-white rounded-lg p-5 shadow-md hover:shadow-xl transition-all border-2 border-gray-200"
+                          className="bg-white rounded-2xl border shadow-sm p-5"
                         >
-                          {/* Ranking Badge */}
-                          <div className="flex justify-center mb-3">
-                            <div
-                              className={`w-14 h-14 rounded-full flex items-center justify-center ${
-                                item.rank === 1
-                                  ? "bg-yellow-100"
-                                  : item.rank === 2
-                                  ? "bg-gray-100"
-                                  : "bg-orange-100"
-                              }`}
-                            >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
                               <FaMedal
-                                className={`${getMedalColor(
-                                  item.rank
-                                )} text-3xl`}
+                                className={`${medalColor(item.rank)} text-2xl`}
                               />
+                              <span className="text-sm font-semibold text-gray-700">
+                                #{item.rank}
+                              </span>
                             </div>
+
+                            <span className="text-[11px] px-3 py-1 rounded-full bg-gray-100 text-gray-700">
+                              {item.usroh}
+                            </span>
                           </div>
 
-                          {/* Nama & Info */}
-                          <div className="text-center mb-4">
-                            <p className="font-bold text-gray-800 text-lg mb-1">
+                          <div className="mt-3">
+                            <p className="text-lg font-semibold text-gray-900">
                               {item.name}
                             </p>
-                            <p className="text-xs text-gray-500 mb-1">
-                              {item.nim}
-                            </p>
-                            <p className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded inline-block">
-                              {item.usroh}
-                            </p>
+                            <p className="text-xs text-gray-500">{item.nim}</p>
                           </div>
 
-                          {/* Stats */}
-                          <div className="border-t border-gray-200 pt-3 space-y-2">
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-gray-600">
-                                Hafalan:
+                          <div className="mt-4 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-gray-500">
+                                Hafalan
                               </span>
-                              <span className="font-semibold text-blue-600">
-                                <FaBook className="inline mr-1" />
-                                {item.hafalanSelesai}
+                              <span className="text-sm font-semibold text-blue-700 inline-flex items-center gap-2">
+                                <FaBook /> {item.hafalanSelesai}
                               </span>
                             </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-gray-600">
-                                Assignment:
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-gray-500">
+                                Assignment
                               </span>
-                              <span className="font-semibold text-green-600">
-                                <FaClipboardCheck className="inline mr-1" />
-                                {item.assignmentBenar}
+                              <span className="text-sm font-semibold text-emerald-700 inline-flex items-center gap-2">
+                                <FaClipboardCheck /> {item.assignmentBenar}
                               </span>
                             </div>
                           </div>
@@ -293,118 +309,110 @@ export default function LeaderboardPage() {
                       ))}
                     </div>
                   </div>
-                </div>
-              )}
-
-              {/* === Search Bar === */}
-              <div className="w-full max-w-5xl">
-                <div className="relative">
-                  <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Cari nama atau NIM resident..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#004220] focus:border-[#004220] transition"
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery("")}
-                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 font-bold"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-                {searchQuery && (
-                  <p className="text-sm text-gray-500 mt-2">
-                    Ditemukan {filteredData.length} hasil untuk "{searchQuery}"
-                  </p>
                 )}
-              </div>
 
-              {/* === Daftar Ranking === */}
-              <div className="w-full max-w-5xl">
-                {filteredData.length === 0 ? (
-                  <div className="text-center py-10 text-gray-500 bg-white rounded-lg border border-gray-200">
-                    <p className="mb-2">Tidak ada data yang ditemukan</p>
-                    {searchQuery && (
-                      <button
-                        onClick={() => setSearchQuery("")}
-                        className="text-[#004220] hover:underline text-sm"
+                {/* LIST
+                    Desktop: table-like
+                    Mobile: card list */}
+                <div className="mt-6">
+                  {/* Mobile cards */}
+                  <div className="grid grid-cols-1 gap-3 md:hidden">
+                    {filteredData.map((item) => (
+                      <div
+                        key={item.id}
+                        className="bg-white rounded-2xl border shadow-sm p-4"
                       >
-                        Reset pencarian
-                      </button>
-                    )}
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="inline-flex items-center gap-2">
+                              <span className="h-8 w-8 rounded-xl bg-gray-100 flex items-center justify-center font-bold text-gray-700">
+                                {item.rank}
+                              </span>
+                              <div>
+                                <p className="font-semibold text-gray-900">
+                                  {item.name}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {item.nim} • {item.usroh}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <FaMedal
+                            className={`${medalColor(item.rank)} text-xl`}
+                          />
+                        </div>
+
+                        <div className="mt-3 flex gap-2 flex-wrap">
+                          <span className="inline-flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-full text-xs font-semibold text-blue-700">
+                            <FaBook /> {item.hafalanSelesai}
+                          </span>
+                          <span className="inline-flex items-center gap-2 bg-emerald-50 px-3 py-1 rounded-full text-xs font-semibold text-emerald-700">
+                            <FaClipboardCheck /> {item.assignmentBenar}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ) : (
-                  <div className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
-                    {/* Table Header */}
-                    <div className="bg-gray-50 border-b border-gray-200 px-6 py-3 grid grid-cols-12 gap-4 font-semibold text-sm text-gray-700">
+
+                  {/* Desktop table */}
+                  <div className="hidden md:block bg-white rounded-2xl border shadow-sm overflow-hidden">
+                    <div className="bg-gray-50 border-b px-6 py-3 grid grid-cols-12 gap-4 font-semibold text-sm text-gray-700">
                       <div className="col-span-1">Rank</div>
                       <div className="col-span-5">Resident</div>
                       <div className="col-span-3 text-center">Hafalan</div>
                       <div className="col-span-3 text-center">Assignment</div>
                     </div>
 
-                    {/* Table Body */}
-                    <div className="divide-y divide-gray-200">
+                    <div className="divide-y">
                       {filteredData.map((item) => (
                         <div
                           key={item.id}
                           className="px-6 py-4 grid grid-cols-12 gap-4 items-center hover:bg-gray-50 transition"
                         >
-                          {/* Rank */}
                           <div className="col-span-1">
                             <div
-                              className={`w-8 h-8 flex items-center justify-center rounded-full font-bold text-sm ${
+                              className={[
+                                "w-9 h-9 flex items-center justify-center rounded-xl font-bold text-sm",
                                 item.rank <= 3
                                   ? "bg-yellow-100 text-yellow-700"
-                                  : "bg-gray-100 text-gray-600"
-                              }`}
+                                  : "bg-gray-100 text-gray-700",
+                              ].join(" ")}
                             >
                               {item.rank}
                             </div>
                           </div>
 
-                          {/* Resident Info */}
-                          <div className="col-span-5">
-                            <p className="font-semibold text-gray-800">
+                          <div className="col-span-5 min-w-0">
+                            <p className="font-semibold text-gray-900 truncate">
                               {item.name}
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-gray-500 truncate">
                               {item.nim} • {item.usroh}
                             </p>
                           </div>
 
-                          {/* Hafalan */}
                           <div className="col-span-3 text-center">
-                            <div className="inline-flex items-center gap-1 bg-blue-50 px-3 py-1 rounded-full">
-                              <FaBook className="text-blue-600 text-sm" />
-                              <span className="font-semibold text-blue-700">
-                                {item.hafalanSelesai}
-                              </span>
-                            </div>
+                            <span className="inline-flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-full text-xs font-semibold text-blue-700">
+                              <FaBook /> {item.hafalanSelesai}
+                            </span>
                           </div>
 
-                          {/* Assignment */}
                           <div className="col-span-3 text-center">
-                            <div className="inline-flex items-center gap-1 bg-green-50 px-3 py-1 rounded-full">
-                              <FaClipboardCheck className="text-green-600 text-sm" />
-                              <span className="font-semibold text-green-700">
-                                {item.assignmentBenar}
-                              </span>
-                            </div>
+                            <span className="inline-flex items-center gap-2 bg-emerald-50 px-3 py-1 rounded-full text-xs font-semibold text-emerald-700">
+                              <FaClipboardCheck /> {item.assignmentBenar}
+                            </span>
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
-                )}
-              </div>
-            </>
-          )}
-        </section>
+                </div>
+              </>
+            )}
+          </section>
+        </div>
       </main>
     </div>
   );

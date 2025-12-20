@@ -1,25 +1,236 @@
 "use client";
 
-import { useAuth } from "@/lib/useAuth";
-import { getUser, clearAuth } from "@/lib/api";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import Sidebar from "@/components/Sidebar";
+import { useEffect, useMemo, useState } from "react";
+
+import { useAuth } from "@/lib/useAuth";
+import { apiGet, clearAuth, getUser } from "@/lib/api";
 import LogoutModal from "@/components/LogoutModal";
 
-export default function DashboardPage() {
-  const [isOpen, setIsOpen] = useState(true);
-  const toggleSidebar = () => setIsOpen((prev) => !prev);
+type ResidentRow = {
+  id: number;
+  name: string;
+  email: string;
+  nim: string;
+  jurusan: string;
+  angkatan: number;
+  usroh: string;
+  noTelp: string;
+};
+
+type TargetProgressRow = {
+  targetId: number;
+  nama: string;
+  surah: string;
+  ayatMulai: number;
+  ayatAkhir: number;
+  selesai: number;
+  belum: number;
+};
+
+type ApiRes<T> = { success: boolean; message?: string; data: T };
+type ProgressRes = {
+  success: boolean;
+  data: TargetProgressRow[];
+  meta?: { totalResident: number };
+  message?: string;
+};
+
+function StatCard({
+  label,
+  value,
+  accent = "green",
+  loading,
+  hint,
+}: {
+  label: string;
+  value: number;
+  accent?: "green" | "blue" | "amber";
+  loading?: boolean;
+  hint?: string;
+}) {
+  const accentMap = {
+    green: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+    blue: "bg-blue-50 text-blue-700 ring-blue-100",
+    amber: "bg-amber-50 text-amber-800 ring-amber-100",
+  } as const;
+
+  return (
+    <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5 hover:shadow transition">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs text-gray-500">{label}</p>
+          <p className="mt-2 text-3xl font-semibold text-gray-900 tabular-nums">
+            {loading ? "—" : value}
+          </p>
+          {hint ? (
+            <p className="mt-1 text-[11px] text-gray-500">{hint}</p>
+          ) : null}
+        </div>
+
+        <div
+          className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ${accentMap[accent]}`}
+        >
+          Total
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProgressBar({ value }: { value: number }) {
+  const v = Math.max(0, Math.min(100, value));
+  return (
+    <div className="w-full">
+      <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
+        <div
+          className="h-2 rounded-full bg-emerald-600"
+          style={{ width: `${v}%` }}
+        />
+      </div>
+      <p className="mt-1 text-[11px] text-gray-500">{v.toFixed(0)}%</p>
+    </div>
+  );
+}
+
+function ResidentMiniCard({ r }: { r: ResidentRow }) {
+  const initial = r?.name ? r.name.charAt(0).toUpperCase() : "R";
+
+  return (
+    <div className="rounded-xl border border-gray-100 bg-white p-4 hover:bg-gray-50 transition">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3 min-w-0">
+          <div className="bg-yellow-400 text-black w-9 h-9 flex items-center justify-center rounded-full font-bold shrink-0">
+            {initial}
+          </div>
+
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-900 truncate">
+              {r.name}
+            </p>
+            <p className="text-xs text-gray-500 truncate">{r.email}</p>
+            <p className="mt-1 text-[11px] text-gray-600 truncate">
+              NIM: {r.nim} • {r.jurusan} • {r.angkatan}
+            </p>
+          </div>
+        </div>
+
+        <Link
+          href={`/dashboard/asisten-musyrif/input-nilai-tahfidz?residentId=${r.id}`}
+          className="shrink-0 inline-flex items-center rounded-lg px-3 py-2 text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700"
+        >
+          Input Nilai
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function TargetProgressCard({ r }: { r: TargetProgressRow }) {
+  const total = r.selesai + r.belum;
+  const pct = total > 0 ? (r.selesai / total) * 100 : 0;
+
+  return (
+    <div className="rounded-xl border border-gray-100 bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-gray-900 truncate">
+            {r.nama}
+          </p>
+          <p className="text-xs text-gray-500 truncate">
+            {r.surah} ({r.ayatMulai}–{r.ayatAkhir})
+          </p>
+        </div>
+
+        <div className="shrink-0 text-xs font-semibold text-emerald-700 tabular-nums">
+          {r.selesai}/{total}
+        </div>
+      </div>
+
+      <div className="mt-3">
+        <ProgressBar value={pct} />
+      </div>
+    </div>
+  );
+}
+
+export default function DashboardAsistenMusyrif() {
   const router = useRouter();
-  const { user } = useAuth(["ASISTEN"]);
+  useAuth(["ASISTEN"]);
+
   const [userData, setUserData] = useState<any>(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
+  // residents
+  const [residents, setResidents] = useState<ResidentRow[]>([]);
+  const [loadingResidents, setLoadingResidents] = useState(true);
+  const [residentsError, setResidentsError] = useState<string | null>(null);
+
+  // progress target
+  const [progressRows, setProgressRows] = useState<TargetProgressRow[]>([]);
+  const [loadingProgress, setLoadingProgress] = useState(true);
+  const [progressError, setProgressError] = useState<string | null>(null);
+
   useEffect(() => {
     const currentUser = getUser();
-    if (currentUser) {
-      setUserData(currentUser);
-    }
+    if (currentUser) setUserData(currentUser);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    (async () => {
+      try {
+        setLoadingResidents(true);
+        setResidentsError(null);
+
+        const res = await apiGet<ApiRes<ResidentRow[]>>(
+          "/api/asisten/residents"
+        );
+        if (!active) return;
+
+        setResidents(res.data || []);
+      } catch (e: any) {
+        if (!active) return;
+        setResidents([]);
+        setResidentsError(e?.message || "Gagal memuat resident binaan.");
+      } finally {
+        if (active) setLoadingResidents(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    (async () => {
+      try {
+        setLoadingProgress(true);
+        setProgressError(null);
+
+        const res = await apiGet<ProgressRes>(
+          "/api/asisten/tahfidz/progress-target"
+        );
+        if (!active) return;
+
+        setProgressRows(res.data || []);
+      } catch (e: any) {
+        if (!active) return;
+        setProgressRows([]);
+        setProgressError(e?.message || "Gagal memuat progress tahfidz.");
+      } finally {
+        if (active) setLoadingProgress(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const handleLogout = () => {
@@ -27,182 +238,251 @@ export default function DashboardPage() {
     router.push("/login");
   };
 
-  // Jadwal kegiatan harian (same as current ASISTEN)
-  const schedule = [
-    {
-      time: "04.00 – 04.30",
-      activity: "Shalat Malam dan Sahur (Disunnahkan berpuasa senin & kamis atau Puasa Daud)",
-    },
-    { time: "04.30 – 05.00", activity: "Shalat subuh, doa dan kultum" },
-    {
-      time: "05.00 – 06.00",
-      activity: "Materi dan kegiatan (terjadwal selama 4 kali)",
-    },
-    {
-      time: "06.00 – 06.45",
-      activity: "Bersih-bersih dan persiapan ke kampus",
-    },
-    { time: "06.45 – 17.00", activity: "Berada di kampus" },
-    { time: "17.00 – 17.30", activity: "Persiapan Shalat maghrib" },
-    { time: "17.30 – 18.00", activity: "Shalat Maghrib dan Kultum" },
-    { time: "18.00 – 19.00", activity: "Tadarus al-Qur'an (setiap hari)" },
-    { time: "19.00 – 19.30", activity: "Shalat Isya' dan Kultum" },
-    {
-      time: "19.30 – 21.00",
-      activity: "Materi dan kegiatan (terjadwal selama 3 kali)",
-    },
-    { time: "21.00 – 22.00", activity: "Belajar dan Mengerjakan Tugas" },
-    { time: "22.00 – 04.00", activity: "Tidur" },
-  ];
+  const initial = userData?.name ? userData.name.charAt(0).toUpperCase() : "A";
+  const topResidents = useMemo(() => residents.slice(0, 5), [residents]);
 
-  // Fungsi untuk menentukan warna tiap baris berdasarkan jam (same as PEMBINA)
-  const getRowColor = (time: string): string => {
-    if (time.startsWith("04:") || time.startsWith("05:")) return "bg-[#FCF5C7]";
-    if (
-      time.startsWith("06:") ||
-      time.startsWith("07:") ||
-      time.startsWith("08:")
-    )
-      return "bg-[#D6EADF]";
-    if (
-      time.startsWith("17:") ||
-      time.startsWith("18:") ||
-      time.startsWith("19:")
-    )
-      return "bg-[#FCE1E4]";
-    if (time.startsWith("21:") || time.startsWith("22:")) return "bg-[#DAEAF6]";
-    return "bg-white";
-  };
+  const totalResident = residents.length;
 
-  // Menu fitur ASISTEN (3 menu utama)
-  const features = [
-    {
-      title: "Resident Per Usroh",
-      icon: "/res_perlantai.svg", // reuse PEMBINA icon
-      href: "/dashboard/asisten-musyrif/resident-per-usroh",
-    },
-    {
-      title: "Input Nilai Tahfidz",
-      icon: "/tinjau_nilaiTahfidz.svg", // reuse PEMBINA icon
-      href: "/dashboard/asisten-musyrif/input-nilai-tahfidz",
-    },
-    {
-      title: "Buat Assignment",
-      icon: "/assigment.svg", // reuse PEMBINA icon
-      href: "/dashboard/asisten-musyrif/buat-assignment",
-    },
-  ];
+  // ringkasan progress overall (dari rows target)
+  const totalSelesai = useMemo(
+    () => progressRows.reduce((acc, r) => acc + (r.selesai || 0), 0),
+    [progressRows]
+  );
+  const totalBelum = useMemo(
+    () => progressRows.reduce((acc, r) => acc + (r.belum || 0), 0),
+    [progressRows]
+  );
 
   return (
-    <div className="flex flex-col min-h-screen bg-white">
-      {/* ===== SIDEBAR ===== */}
-      {/* <Sidebar isOpen={isOpen} toggleSidebar={toggleSidebar} /> */}
-
-      {/* ===== MAIN CONTENT ===== */}
-      <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out`}>
-        {/* ===== HEADER ===== */}
-        <header className="flex justify-between items-center px-10 py-4 bg-white shadow">
-          <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-[#F5F5F5]">
+      {/* TOP HEADER */}
+      <header className="h-16 bg-white border-b flex items-center sticky top-0 z-30">
+        <div className="w-full mx-auto max-w-7xl px-6 flex items-center justify-between">
+          <div className="flex items-center gap-6">
             <img src="/lg_umy.svg" alt="UMY" className="h-8" />
-            <img src="/lg_unires.svg" alt="Unires" className="h-8" />
+            <img src="/lg_unires.svg" alt="UNIRES" className="h-8" />
           </div>
+
           <button
             onClick={() => setShowLogoutModal(true)}
-            className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-md transition"
+            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold"
           >
             Logout
           </button>
-        </header>
+        </div>
+      </header>
 
-        {/* ===== LOGOUT MODAL ===== */}
-        <LogoutModal
-          open={showLogoutModal}
-          onCancel={() => setShowLogoutModal(false)}
-          onLogout={handleLogout}
-        />
+      <LogoutModal
+        open={showLogoutModal}
+        onCancel={() => setShowLogoutModal(false)}
+        onLogout={handleLogout}
+      />
 
-        {/* ===== SUBHEADER ===== */}
-        <div className="bg-[#004220] text-white py-3 px-3 relative">
-          <h1 className="absolute top-2 left-1/2 -translate-x-1/2 text-lg font-semibold mt-3">
-            Dashboard Asisten Musyrif
-          </h1>
-
-          <div className="flex items-center ml-7 mt-6 mb-2">
-            <div className="bg-yellow-400 text-[#000000] w-11 h-11 flex items-center justify-center rounded-full font-bold text-lg">
-              {userData
-                ? userData.name
-                  ? userData.name.charAt(0).toUpperCase()
-                  : "A"
-                : "A"}
+      {/* BODY */}
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 py-4 sm:py-6">
+        {/* Title hijau */}
+        <div className="bg-[#004220] text-white text-center py-5 rounded-2xl text-xl font-semibold shadow-sm relative">
+          Dashboard Asisten Musyrif
+          <div className="hidden md:flex absolute left-6 top-1/2 -translate-y-1/2 items-center gap-3">
+            <div className="bg-yellow-400 text-black w-10 h-10 flex items-center justify-center rounded-full font-bold text-base">
+              {initial}
             </div>
-            <div className="ml-3 flex flex-col justify-center leading-tight">
-              <p className="font-medium text-white text-sm">
-                {userData ? userData.name : "Loading..."}
+            <div className="leading-tight text-left">
+              <p className="text-sm font-medium">
+                {userData?.name || "Asisten"}
               </p>
-              <p className="text-white text-xs">
-                {userData ? userData.email : ""}
-              </p>
+              <p className="text-xs opacity-90">{userData?.email || ""}</p>
             </div>
           </div>
         </div>
 
-        {/* ===== JUDUL ===== */}
-        <h2 className="text-center text-[#0D6B44] text-2xl font-bold mb-3 mt-7">
-          Kegiatan Harian di UNIRES
-        </h2>
+        <div className="mt-6 space-y-6">
+          {/* Ringkasan */}
+          <section className="space-y-3">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-sm font-semibold text-gray-900">Ringkasan</h2>
+              <p className="text-[11px] text-gray-500">
+                Data binaan usroh kamu
+              </p>
+            </div>
 
-        {/* ===== TABEL JADWAL ===== */}
-        <div className="flex justify-center mb-10">
-          <div className="rounded-xl overflow-hidden border border-[#004220] w-[650px]">
-            <table className="text-sm w-full border-collapse">
-              <thead className="bg-[#004220]/70 text-white">
-                <tr>
-                  <th className="py-2 px-4 w-1/3 border-b border-[#004220]">
-                    Waktu
-                  </th>
-                  <th className="py-2 px-4 border-b border-[#004220]">
-                    Kegiatan
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="text-center text-[#0D6B44]">
-                {schedule.map((item, i) => (
-                  <tr
-                    key={i}
-                    className={`${getRowColor(
-                      item.time
-                    )} border-b border-[#004220] last:border-b-0`}
-                  >
-                    <td className="py-2 px-4 border-r border-[#004220]">
-                      {item.time}
-                    </td>
-                    <td className="py-2 px-4">{item.activity}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <StatCard
+                label="Total Resident Binaan"
+                value={totalResident}
+                loading={loadingResidents}
+                accent="green"
+                hint="Resident dalam usroh binaan"
+              />
+              <StatCard
+                label="Total Selesai (Akumulasi)"
+                value={totalSelesai}
+                loading={loadingProgress}
+                accent="blue"
+                hint="Dari semua target (count selesai)"
+              />
+              <StatCard
+                label="Total Belum (Akumulasi)"
+                value={totalBelum}
+                loading={loadingProgress}
+                accent="amber"
+                hint="Dari semua target (count belum)"
+              />
+            </div>
+          </section>
+
+          {/* Grid 2 kolom: Residents + Progress */}
+          <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+            {/* Panel resident (Top 5 + scroll) */}
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-6 py-5 border-b flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    Resident Binaan (Top 5)
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Klik “Input Nilai” untuk isi nilai tahfidz
+                  </p>
+                </div>
+
+                <Link
+                  href="/dashboard/asisten-musyrif/resident-per-usroh"
+                  className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+                >
+                  Lihat semua →
+                </Link>
+              </div>
+
+              {residentsError ? (
+                <div className="px-6 py-4 text-xs text-red-700 bg-red-50 border-b border-red-100">
+                  {residentsError}
+                </div>
+              ) : null}
+
+              <div className="p-6">
+                <div className="max-h-[360px] overflow-auto space-y-3">
+                  {loadingResidents ? (
+                    <div className="text-xs text-gray-500">Memuat data...</div>
+                  ) : null}
+
+                  {!loadingResidents &&
+                    topResidents.map((r) => (
+                      <ResidentMiniCard key={r.id} r={r} />
+                    ))}
+
+                  {!loadingResidents && !topResidents.length ? (
+                    <div className="text-xs text-gray-500">
+                      Belum ada resident binaan.
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            {/* Panel progress target (scroll) */}
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-6 py-5 border-b flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    Progress Tahfidz per Target
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Selesai vs belum selesai
+                  </p>
+                </div>
+
+                <Link
+                  href="/dashboard/asisten-musyrif/input-nilai-tahfidz"
+                  className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+                >
+                  Input nilai →
+                </Link>
+              </div>
+
+              {progressError ? (
+                <div className="px-6 py-4 text-xs text-red-700 bg-red-50 border-b border-red-100">
+                  {progressError}
+                </div>
+              ) : null}
+
+              <div className="p-6">
+                <div className="max-h-[360px] overflow-auto space-y-3">
+                  {loadingProgress ? (
+                    <div className="text-xs text-gray-500">Memuat data...</div>
+                  ) : null}
+
+                  {!loadingProgress &&
+                    progressRows.map((r) => (
+                      <TargetProgressCard key={r.targetId} r={r} />
+                    ))}
+
+                  {!loadingProgress && !progressRows.length ? (
+                    <div className="text-xs text-gray-500">
+                      Belum ada data progress.
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Menu (format UMY, sederhana) */}
+          <section className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b">
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="text-sm font-semibold text-gray-900">
+                  Menu Asisten
+                </h2>
+                <p className="text-xs text-gray-500">
+                  Akses cepat fitur asisten
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Link
+                href="/dashboard/asisten-musyrif/resident-per-usroh"
+                className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5 hover:shadow-md transition"
+              >
+                <p className="text-sm font-semibold text-gray-900">
+                  Resident Per Usroh
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                  Lihat daftar resident binaan
+                </p>
+              </Link>
+
+              <Link
+                href="/dashboard/asisten-musyrif/input-nilai-tahfidz"
+                className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5 hover:shadow-md transition"
+              >
+                <p className="text-sm font-semibold text-gray-900">
+                  Input Nilai Tahfidz
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                  Input/update nilai tahfidz
+                </p>
+              </Link>
+
+              <Link
+                href="/dashboard/asisten-musyrif/buat-assignment"
+                className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5 hover:shadow-md transition"
+              >
+                <p className="text-sm font-semibold text-gray-900">
+                  Buat Assignment
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                  Kelola soal & gambar
+                </p>
+              </Link>
+            </div>
+          </section>
+
+          <div className="text-xs text-gray-500">
+            © 2025 Universitas Muhammadiyah Yogyakarta - Asrama Unires
           </div>
-        </div>
-
-        {/* ===== BUTTON FITUR ===== */}
-        <div className="flex justify-center flex-wrap gap-8 mb-16">
-          {features.map((f) => (
-            <a
-              key={f.title}
-              href={f.href}
-              className="flex flex-col items-center text-center bg-[#D9D9D9] hover:bg-[#CFE8D7] transition rounded-md w-44 h-36 justify-center"
-            >
-              <img src={f.icon} alt={f.title} className="h-15 mb-3" />
-              <p className="text-[#0D6B44] text-sm font-semibold">{f.title}</p>
-            </a>
-          ))}
         </div>
       </div>
-
-      {/* ===== FOOTER ===== */}
-      <footer className="bg-[#004220] text-center text-white py-4 text-sm mt-auto">
-        © 2025 Universitas Muhammadiyah Yogyakarta - Asrama Unires
-      </footer>
     </div>
   );
 }

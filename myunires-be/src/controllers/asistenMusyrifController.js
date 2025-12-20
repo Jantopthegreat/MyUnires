@@ -112,72 +112,108 @@ export const getNilaiTahfidzByResident = async (req, res) => {
   try {
     const { residentId } = req.params;
 
+    const asisten = await prisma.asistenMusyrif.findUnique({
+      where: { userId: req.user.id },
+      select: { usrohId: true },
+    });
+
+    if (!asisten?.usrohId) {
+      return res.status(404).json({ message: "Asisten tidak memiliki usroh binaan." });
+    }
+
     const nilaiTahfidz = await prisma.nilaiTahfidz.findMany({
-      where: { residentId: Number(residentId) },
+      where: {
+        residentId: Number(residentId),
+        resident: { usrohId: asisten.usrohId }, // ✅ enforce ownership via relation filter
+      },
       include: {
         targetHafalan: { select: { nama: true, surah: true } },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    if (!nilaiTahfidz.length)
-      return res.status(404).json({ message: "Belum ada nilai tahfidz untuk resident ini." });
+    if (!nilaiTahfidz.length) {
+      return res.status(404).json({
+        message: "Belum ada nilai tahfidz (atau resident bukan binaan usroh kamu).",
+      });
+    }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Data nilai tahfidz berhasil diambil.",
       data: nilaiTahfidz,
     });
   } catch (error) {
     console.error("❌ Error getNilaiTahfidzByResident:", error);
-    res.status(500).json({ message: "Terjadi kesalahan server." });
+    return res.status(500).json({ message: "Terjadi kesalahan server." });
   }
 };
+
+
 
 /**
  * ✅ Tambah / update nilai tahfidz (oleh asisten musyrif)
  */
 export const createOrUpdateNilaiTahfidz = async (req, res) => {
   try {
-    const { residentId, targetHafalanId, status, nilaiHuruf } = req.body;
+    const residentIdNum = Number(req.body.residentId);
+    const targetIdNum = Number(req.body.targetHafalanId);
+    const status = String(req.body.status || "").trim();
+    const nilaiHuruf = req.body.nilaiHuruf ?? null;
 
-    if (!residentId || !targetHafalanId || !status || !nilaiHuruf) {
-      return res.status(400).json({ message: "Semua field wajib diisi." });
+    if (!residentIdNum || !targetIdNum || !status) {
+      return res.status(400).json({
+        message: "residentId, targetHafalanId, dan status wajib diisi.",
+      });
     }
 
-    const existing = await prisma.nilaiTahfidz.findFirst({
-      where: { residentId, targetHafalanId },
+    const asisten = await prisma.asistenMusyrif.findUnique({
+      where: { userId: req.user.id },
+      select: { usrohId: true },
     });
 
-    let result;
-    if (existing) {
-      result = await prisma.nilaiTahfidz.update({
-        where: { id: existing.id },
-        data: { status, nilaiHuruf },
-      });
-    } else {
-      result = await prisma.nilaiTahfidz.create({
-        data: {
-          residentId,
-          targetHafalanId,
-          status,
-          nilaiHuruf,
-        },
-      });
+    if (!asisten?.usrohId) {
+      return res.status(404).json({ message: "Asisten tidak memiliki usroh binaan." });
     }
 
-    res.status(200).json({
+    const resident = await prisma.resident.findFirst({
+      where: { id: residentIdNum, usrohId: asisten.usrohId },
+      select: { id: true },
+    });
+
+    if (!resident) {
+      return res.status(403).json({ message: "Resident ini bukan binaan usroh kamu." });
+    }
+
+    const result = await prisma.nilaiTahfidz.upsert({
+      where: {
+        // nama field ini biasanya otomatis jadi residentId_targetHafalanId
+        residentId_targetHafalanId: {
+          residentId: residentIdNum,
+          targetHafalanId: targetIdNum,
+        },
+      },
+      update: { status, nilaiHuruf },
+      create: {
+        residentId: residentIdNum,
+        targetHafalanId: targetIdNum,
+        status,
+        nilaiHuruf,
+      },
+    });
+
+    return res.status(200).json({
       success: true,
-      message: existing
-        ? "Nilai tahfidz berhasil diperbarui."
-        : "Nilai tahfidz berhasil ditambahkan.",
+      message: "Nilai tahfidz berhasil disimpan.",
       data: result,
     });
   } catch (error) {
     console.error("❌ Error createOrUpdateNilaiTahfidz (asisten):", error);
-    res.status(500).json({ message: "Terjadi kesalahan server." });
+    return res.status(500).json({ message: "Terjadi kesalahan server." });
   }
 };
+
+
 
 /**
  * ✅ Lihat materi (read-only)
@@ -239,6 +275,68 @@ export const getAllTargetHafalan = async (req, res) => {
   } catch (error) {
     console.error("❌ Error getAllTargetHafalan (asisten):", error);
     res.status(500).json({ message: "Terjadi kesalahan server." });
+  }
+};
+
+export const getTahfidzProgressByTargetAsisten = async (req, res) => {
+  try {
+    const asisten = await prisma.asistenMusyrif.findUnique({
+      where: { userId: req.user.id },
+      select: { usrohId: true },
+    });
+
+    if (!asisten?.usrohId) {
+      return res.status(404).json({ message: "Asisten tidak memiliki usroh binaan." });
+    }
+
+    // total resident binaan
+    const totalResident = await prisma.resident.count({
+      where: { usrohId: asisten.usrohId },
+    });
+
+    // hitung yang selesai per target (ubah status selesai sesuai standar kamu)
+    const selesaiGrouped = await prisma.nilaiTahfidz.groupBy({
+      by: ["targetHafalanId"],
+      where: {
+        resident: { usrohId: asisten.usrohId },
+        status: "SELESAI", // kalau status kamu beda, ganti di sini
+      },
+      _count: { _all: true },
+    });
+
+    const selesaiMap = new Map(
+      selesaiGrouped.map((x) => [x.targetHafalanId, x._count._all])
+    );
+
+    // ambil master target
+    const targets = await prisma.targetHafalan.findMany({
+      select: { id: true, nama: true, surah: true, ayatMulai: true, ayatAkhir: true },
+      orderBy: { id: "asc" },
+    });
+
+    const rows = targets.map((t) => {
+      const selesai = selesaiMap.get(t.id) ?? 0;
+      const belum = Math.max(0, totalResident - selesai);
+
+      return {
+        targetId: t.id,
+        nama: t.nama,
+        surah: t.surah,
+        ayatMulai: t.ayatMulai,
+        ayatAkhir: t.ayatAkhir,
+        selesai,
+        belum,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: rows,
+      meta: { totalResident },
+    });
+  } catch (error) {
+    console.error("❌ Error getTahfidzProgressByTargetAsisten:", error);
+    return res.status(500).json({ message: "Terjadi kesalahan server." });
   }
 };
 

@@ -1,10 +1,10 @@
 "use client";
-import { useState, useEffect } from "react";
+
+import { useEffect, useState } from "react";
 import { FaSearch, FaPlus } from "react-icons/fa";
-import Sidebar from "@/components/Sidebar";
+import Sidebar_Musyrif from "@/components/sidebar_musyrif";
 import CustomSelect from "@/components/CustomSelect";
 import Swal from "sweetalert2";
-import { clearAuth } from "@/lib/api";
 
 interface AssignmentData {
   id: number;
@@ -52,41 +52,42 @@ interface FormData {
 }
 
 export default function AssignmentPage() {
+  // Sidebar state (desktop + mobile)
   const [isOpen, setIsOpen] = useState(true);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const toggleSidebar = () => setIsOpen((prev) => !prev);
 
-  // State untuk data dari backend
+  // Data
   const [assignments, setAssignments] = useState<AssignmentData[]>([]);
   const [filteredAssignments, setFilteredAssignments] = useState<
     AssignmentData[]
   >([]);
   const [kategoriList, setKategoriList] = useState<KategoriOption[]>([]);
   const [materiList, setMateriList] = useState<MateriOption[]>([]);
-  // Untuk filter bar
-  const [filteredMateriListFilterBar, setFilteredMateriListFilterBar] = useState<MateriOption[]>([]);
+  const [filteredMateriListFilterBar, setFilteredMateriListFilterBar] =
+    useState<MateriOption[]>([]);
   const [filteredMateriList, setFilteredMateriList] = useState<MateriOption[]>(
     []
   );
 
-  // State untuk filter
+  // Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedKategoriFilter, setSelectedKategoriFilter] =
     useState("Kategori (All)");
   const [selectedMateriFilter, setSelectedMateriFilter] =
     useState("Materi (All)");
 
-  // State untuk semua modal
+  // Modals
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
 
-  // State untuk data yang dipilih
+  // Selected row
   const [selectedAssignment, setSelectedAssignment] =
     useState<AssignmentData | null>(null);
 
-  // State untuk form
+  // Form
   const [formData, setFormData] = useState<FormData>({
     materiId: "",
     judul: "",
@@ -99,15 +100,13 @@ export default function AssignmentPage() {
     soalImageUrl: undefined,
   });
 
-  // State untuk form kategori selection
   const [selectedKategoriForm, setSelectedKategoriForm] = useState("");
   const [soalImageFile, setSoalImageFile] = useState<File | null>(null);
   const [soalImagePreview, setSoalImagePreview] = useState<string | null>(null);
 
-  // State untuk soal dinamis (untuk UI multiple questions)
+  // Legacy UI state (tetap disimpan kalau nanti dipakai lagi)
   const [questions, setQuestions] = useState(["", "", ""]);
 
-  // Fetch data saat component mount
   useEffect(() => {
     fetchKategori();
     fetchMateri();
@@ -117,7 +116,9 @@ export default function AssignmentPage() {
   // Filter materi berdasarkan kategori yang dipilih di form
   useEffect(() => {
     if (selectedKategoriForm) {
-      const filtered = materiList.filter((m) => m.kategoriId === Number(selectedKategoriForm));
+      const filtered = materiList.filter(
+        (m) => m.kategoriId === Number(selectedKategoriForm)
+      );
       setFilteredMateriList(filtered);
     } else {
       setFilteredMateriList(materiList);
@@ -126,7 +127,11 @@ export default function AssignmentPage() {
 
   // Filter materi di filter bar berdasarkan kategori
   useEffect(() => {
-    if (selectedKategoriFilter && selectedKategoriFilter !== "all" && selectedKategoriFilter !== "Kategori (All)") {
+    if (
+      selectedKategoriFilter &&
+      selectedKategoriFilter !== "all" &&
+      selectedKategoriFilter !== "Kategori (All)"
+    ) {
       const filtered = materiList.filter(
         (m) => m.kategoriId === Number(selectedKategoriFilter)
       );
@@ -136,31 +141,27 @@ export default function AssignmentPage() {
     }
   }, [selectedKategoriFilter, materiList]);
 
-  // Filter assignments berdasarkan search dan filter
+  // Filter assignments berdasarkan search & filter
   useEffect(() => {
     let filtered = [...assignments];
 
-    // Search filter
     if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (a) =>
-          a.judul.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          a.pertanyaan.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          a.materi?.judul.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          a.materi?.kategori?.nama
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase())
+          a.judul.toLowerCase().includes(q) ||
+          a.pertanyaan.toLowerCase().includes(q) ||
+          a.materi?.judul.toLowerCase().includes(q) ||
+          a.materi?.kategori?.nama.toLowerCase().includes(q)
       );
     }
 
-    // Kategori filter
     if (selectedKategoriFilter && selectedKategoriFilter !== "Kategori (All)") {
       filtered = filtered.filter(
         (a) => a.materi?.kategori?.nama === selectedKategoriFilter
       );
     }
 
-    // Materi filter
     if (selectedMateriFilter && selectedMateriFilter !== "Materi (All)") {
       filtered = filtered.filter(
         (a) => a.materi?.judul === selectedMateriFilter
@@ -170,18 +171,16 @@ export default function AssignmentPage() {
     setFilteredAssignments(filtered);
   }, [searchQuery, selectedKategoriFilter, selectedMateriFilter, assignments]);
 
-  // Fetch assignments dari backend
+  // Fetch assignments
   const fetchAssignments = async () => {
     try {
       const token = localStorage.getItem("token");
-
       const response = await fetch(
         "http://localhost:3001/api/musyrif/assignments",
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-
 
       if (response.ok) {
         const result = await response.json();
@@ -195,7 +194,6 @@ export default function AssignmentPage() {
     }
   };
 
-  // Fetch kategori materi dari backend
   const fetchKategori = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -216,7 +214,6 @@ export default function AssignmentPage() {
     }
   };
 
-  // Fetch materi dari backend
   const fetchMateri = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -230,7 +227,6 @@ export default function AssignmentPage() {
       if (response.ok) {
         const result = await response.json();
         const data = result.data || result;
-        // Pastikan kategoriId number
         const materiWithNumberKategoriId = Array.isArray(data)
           ? data.map((m) => ({ ...m, kategoriId: Number(m.kategoriId) }))
           : [];
@@ -241,9 +237,7 @@ export default function AssignmentPage() {
     }
   };
 
-  const handleAddQuestion = () => {
-    setQuestions([...questions, ""]);
-  };
+  const handleAddQuestion = () => setQuestions([...questions, ""]);
 
   const handleChangeQuestion = (index: number, value: string) => {
     const updated = [...questions];
@@ -272,6 +266,7 @@ export default function AssignmentPage() {
 
   const handleEdit = (assignment: AssignmentData) => {
     setSelectedAssignment(assignment);
+
     setFormData({
       materiId: String(assignment.materiId),
       judul: assignment.judul,
@@ -281,13 +276,15 @@ export default function AssignmentPage() {
       opsiC: assignment.opsiC,
       opsiD: assignment.opsiD,
       jawabanBenar: assignment.jawabanBenar,
+      soalImageUrl: assignment.soalImageUrl || undefined,
     });
+
     if (assignment.materi) {
       setSelectedKategoriForm(String(assignment.materi.kategori.id));
     }
+
     setSoalImageFile(null);
     setSoalImagePreview(assignment.soalImageUrl || null);
-    setFormData((prev) => ({ ...prev, soalImageUrl: assignment.soalImageUrl || undefined }));
     setShowEditModal(true);
   };
 
@@ -318,6 +315,7 @@ export default function AssignmentPage() {
           confirmButtonText: "OK",
           timer: 3000,
         });
+
         fetchAssignments();
         setShowDeleteModal(false);
         setSelectedAssignment(null);
@@ -331,7 +329,6 @@ export default function AssignmentPage() {
   };
 
   const handleSubmitAdd = async () => {
-    // Validasi
     if (
       !formData.materiId ||
       !formData.judul ||
@@ -350,22 +347,29 @@ export default function AssignmentPage() {
     }
 
     let uploadedImageUrl: string | undefined = undefined;
+
     try {
       const token = localStorage.getItem("token");
+
       if (soalImageFile) {
         const fd = new FormData();
-        fd.append('file', soalImageFile);
-        const uploadResp = await fetch('http://localhost:3001/api/musyrif/assignments/upload', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: fd,
-        });
+        fd.append("file", soalImageFile);
+
+        const uploadResp = await fetch(
+          "http://localhost:3001/api/musyrif/assignments/upload",
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: fd,
+          }
+        );
+
         if (uploadResp.ok) {
           const uploadJson = await uploadResp.json();
-          uploadedImageUrl = uploadJson.url; // e.g., /uploads/assignments/abc.jpg
+          uploadedImageUrl = uploadJson.url;
         } else {
-          console.error('Upload failed:', uploadResp.status);
-          throw new Error('Gagal mengupload gambar');
+          console.error("Upload failed:", uploadResp.status);
+          throw new Error("Gagal mengupload gambar");
         }
       }
 
@@ -374,7 +378,6 @@ export default function AssignmentPage() {
         materiId: Number(formData.materiId),
         ...(uploadedImageUrl && { soalImageUrl: uploadedImageUrl }),
       };
-      console.log("📝 Creating assignment - payload:", payload);
 
       const response = await fetch(
         "http://localhost:3001/api/musyrif/assignments",
@@ -397,6 +400,7 @@ export default function AssignmentPage() {
           confirmButtonText: "OK",
           timer: 3000,
         });
+
         fetchAssignments();
         setShowAddModal(false);
         resetForm();
@@ -404,21 +408,19 @@ export default function AssignmentPage() {
         let errorData: any = null;
         try {
           errorData = await response.json();
-        } catch (parseErr) {
-          console.error("Failed to parse error response JSON", parseErr);
-        }
-        console.error("Create assignment failed:", response.status, response.statusText, errorData);
-        throw new Error(errorData?.message || `Failed to save (status ${response.status})`);
+        } catch {}
+        throw new Error(
+          errorData?.message || `Failed to save (status ${response.status})`
+        );
       }
     } catch (error: any) {
       console.error("Error saving assignment:", error);
 
-      // If we uploaded an image, prompt user to retry without the image
       if (uploadedImageUrl) {
         const result = await Swal.fire({
           icon: "error",
           title: "Gagal menyimpan dengan gambar",
-          text: "Server mengembalikan error saat menyimpan assignment yang berisi gambar. Coba simpan tanpa gambar?",
+          text: "Server error saat menyimpan assignment dengan gambar. Coba simpan tanpa gambar?",
           showCancelButton: true,
           confirmButtonText: "Simpan tanpa gambar",
           cancelButtonText: "Batal",
@@ -431,18 +433,25 @@ export default function AssignmentPage() {
               ...formData,
               materiId: Number(formData.materiId),
             };
-            console.log("📝 Retrying create without image - payload:", retryPayload);
-            const retryResp = await fetch("http://localhost:3001/api/musyrif/assignments", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify(retryPayload),
-            });
+
+            const retryResp = await fetch(
+              "http://localhost:3001/api/musyrif/assignments",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(retryPayload),
+              }
+            );
 
             if (retryResp.ok) {
-              Swal.fire({ icon: "success", title: "Assignment berhasil ditambahkan tanpa gambar", timer: 2000 });
+              Swal.fire({
+                icon: "success",
+                title: "Assignment berhasil ditambahkan tanpa gambar",
+                timer: 2000,
+              });
               fetchAssignments();
               setShowAddModal(false);
               resetForm();
@@ -451,29 +460,37 @@ export default function AssignmentPage() {
               let retryErr: any = null;
               try {
                 retryErr = await retryResp.json();
-              } catch (e) {
-                console.error("Failed to parse retry error JSON", e);
-              }
-              console.error("Retry without image failed:", retryResp.status, retryResp.statusText, retryErr);
-              Swal.fire("Error", retryErr?.message || `Gagal menyimpan (status ${retryResp.status})`, "error");
+              } catch {}
+              Swal.fire(
+                "Error",
+                retryErr?.message ||
+                  `Gagal menyimpan (status ${retryResp.status})`,
+                "error"
+              );
               return;
             }
           } catch (retryError: any) {
-            console.error("Retry without image error:", retryError);
-            Swal.fire("Error", retryError.message || "Gagal menyimpan assignment", "error");
+            Swal.fire(
+              "Error",
+              retryError.message || "Gagal menyimpan assignment",
+              "error"
+            );
             return;
           }
         }
       }
 
-      Swal.fire("Error", error.message || "Gagal menyimpan assignment", "error");
+      Swal.fire(
+        "Error",
+        error.message || "Gagal menyimpan assignment",
+        "error"
+      );
     }
   };
 
   const handleSubmitEdit = async () => {
     if (!selectedAssignment) return;
 
-    // Validasi
     if (
       !formData.materiId ||
       !formData.judul ||
@@ -494,29 +511,37 @@ export default function AssignmentPage() {
     try {
       const token = localStorage.getItem("token");
       let uploadedImageUrl: string | undefined = undefined;
+
       if (soalImageFile) {
         const fd = new FormData();
-        fd.append('file', soalImageFile);
-        const uploadResp = await fetch('http://localhost:3001/api/musyrif/assignments/upload', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: fd,
-        });
+        fd.append("file", soalImageFile);
+
+        const uploadResp = await fetch(
+          "http://localhost:3001/api/musyrif/assignments/upload",
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: fd,
+          }
+        );
+
         if (uploadResp.ok) {
           const uploadJson = await uploadResp.json();
           uploadedImageUrl = uploadJson.url;
         } else {
-          console.error('Upload failed:', uploadResp.status);
-          throw new Error('Gagal mengupload gambar');
+          console.error("Upload failed:", uploadResp.status);
+          throw new Error("Gagal mengupload gambar");
         }
       }
+
       const payload = {
         ...formData,
         materiId: Number(formData.materiId),
-        ...(soalImagePreview === null && formData.soalImageUrl === undefined ? { soalImageUrl: null } : {}),
+        ...(soalImagePreview === null && formData.soalImageUrl === undefined
+          ? { soalImageUrl: null }
+          : {}),
         ...(uploadedImageUrl ? { soalImageUrl: uploadedImageUrl } : {}),
       };
-      console.log("📝 Updating assignment - payload:", payload);
 
       const response = await fetch(
         `http://localhost:3001/api/musyrif/assignments/${selectedAssignment.id}`,
@@ -539,6 +564,7 @@ export default function AssignmentPage() {
           confirmButtonText: "OK",
           timer: 3000,
         });
+
         fetchAssignments();
         setShowEditModal(false);
         setSelectedAssignment(null);
@@ -547,11 +573,10 @@ export default function AssignmentPage() {
         let errorData: any = null;
         try {
           errorData = await response.json();
-        } catch (parseErr) {
-          console.error("Failed to parse error response JSON", parseErr);
-        }
-        console.error("Update assignment failed:", response.status, response.statusText, errorData);
-        throw new Error(errorData?.message || `Failed to update (status ${response.status})`);
+        } catch {}
+        throw new Error(
+          errorData?.message || `Failed to update (status ${response.status})`
+        );
       }
     } catch (error: any) {
       console.error("Error updating assignment:", error);
@@ -573,6 +598,7 @@ export default function AssignmentPage() {
       opsiC: "",
       opsiD: "",
       jawabanBenar: "A",
+      soalImageUrl: undefined,
     });
     setSelectedKategoriForm("");
     setQuestions(["", "", ""]);
@@ -581,205 +607,215 @@ export default function AssignmentPage() {
   };
 
   return (
-    <div className="min-h-screen flex bg-white">
-      {/* ===== HEADER ===== */}
-      <header className="fixed top-0 left-0 right-0 bg-white z-30 h-16 flex items-center justify-between px-6 border-b">
+    <div className="min-h-screen bg-white">
+      {/* ===== TOP HEADER (no logout) ===== */}
+      <header className="fixed top-0 left-0 right-0 bg-white z-30 h-16 flex items-center justify-between px-4 sm:px-6 border-b">
         <div className="flex items-center gap-3">
-          <img src="/lg_umy.svg" alt="UMY" className="h-10 object-contain" />
+          <button
+            type="button"
+            onClick={() => setMobileOpen(true)}
+            className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+            aria-label="Open menu"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M4 6h16M4 12h16M4 18h16"
+                stroke="#0D6B44"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+
+          <img
+            src="/lg_umy.svg"
+            alt="UMY"
+            className="h-7 sm:h-8 w-auto object-contain shrink-0"
+          />
           <img
             src="/lg_unires.svg"
             alt="UNIRES"
-            className="h-10 object-contain"
+            className="h-7 sm:h-8 w-auto object-contain shrink-0"
           />
         </div>
-        <button
-          onClick={() => setShowLogoutModal(true)}
-          className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-md transition"
-        >
-          Logout
-        </button>
+
+        <div className="w-10" />
       </header>
 
-      {/* ===== LOGOUT MODAL ===== */}
-      {showLogoutModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-white/90 z-50">
-          <div className="bg-[#d1d4d0] rounded-3xl shadow-lg p-8 w-[400px] text-center">
-            <h2 className="text-2xl font-semibold text-[#004220] mb-4">
-              Log Out
-            </h2>
-            <p className="text-gray-700 text-sm mb-1">
-              Tindakan ini akan mengakhiri sesi login Anda.
-            </p>
-            <p className="text-gray-700 text-sm mb-6">
-              Apakah Anda ingin melanjutkan?
-            </p>
-
-            <div className="flex justify-center gap-4">
-              <button
-                onClick={() => setShowLogoutModal(false)}
-                className="bg-[#FFC107] hover:bg-[#ffb300] text-white font-semibold px-6 py-2 rounded-full shadow-md"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  clearAuth();
-                  window.location.href = "/login";
-                }}
-                className="bg-[#E50914] hover:bg-red-700 text-white font-semibold px-6 py-2 rounded-full shadow-md"
-              >
-                Log Out
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===== SIDEBAR ===== */}
-      <Sidebar isOpen={isOpen} toggleSidebar={toggleSidebar} />
+      {/* ===== SIDEBAR (desktop + mobile drawer) ===== */}
+      <Sidebar_Musyrif
+        isOpen={isOpen}
+        toggleSidebar={toggleSidebar}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
+      />
 
       {/* ===== MAIN CONTENT ===== */}
       <main
-        className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
-          isOpen ? "ml-64" : "ml-12"
-        }`}
+        className={[
+          "pt-16 transition-all duration-300 ease-in-out",
+          isOpen ? "md:ml-64" : "md:ml-14",
+          "ml-0",
+        ].join(" ")}
       >
-        <div className="h-16" />
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-4 sm:py-6">
+          <header className="mb-4">
+            <h1 className="bg-[#004220] text-white text-center py-4 sm:py-6 rounded-2xl text-base sm:text-lg font-semibold shadow-sm">
+              Buat Assignment
+            </h1>
+          </header>
 
-        <header className="px-6 py-4">
-          <h1 className="bg-[#004220] text-white text-center py-6 rounded-md text-lg font-semibold">
-            Buat Assignment
-          </h1>
-        </header>
+          {/* ===== FILTER BAR (mobile stack) ===== */}
+          <section className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-5">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex items-center border border-gray-300 rounded-xl px-3 py-2 shadow-sm bg-white w-full sm:w-[280px]">
+                <FaSearch className="text-gray-400 mr-2 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Cari Assignment"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="outline-none text-sm w-full bg-transparent"
+                />
+              </div>
 
-        {/* ===== FILTER BAR ===== */}
-        <section className="flex flex-wrap items-center justify-between px-6 mb-5">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center border border-gray-300 rounded-xl px-3 py-2 shadow-sm bg-white">
-              <FaSearch className="text-gray-400 mr-2" />
-              <input
-                type="text"
-                placeholder="Cari Assignment"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="outline-none text-sm w-40 bg-transparent"
-              />
+              <div className="w-full sm:w-auto">
+                <CustomSelect
+                  iconSrc="/filter_icon.svg"
+                  options={[
+                    "Kategori (All)",
+                    ...kategoriList.map((k) => k.nama),
+                  ]}
+                  value={selectedKategoriFilter}
+                  onChange={(value) => {
+                    setSelectedKategoriFilter(value);
+                    setSelectedMateriFilter("Materi (All)");
+                  }}
+                />
+              </div>
+
+              <div className="w-full sm:w-auto">
+                <CustomSelect
+                  iconSrc="/filter_icon.svg"
+                  options={[
+                    "Materi (All)",
+                    ...filteredMateriListFilterBar.map((m) => m.judul),
+                  ]}
+                  value={selectedMateriFilter}
+                  onChange={setSelectedMateriFilter}
+                />
+              </div>
             </div>
 
-            <CustomSelect
-              iconSrc="/filter_icon.svg"
-              options={["Kategori (All)", ...kategoriList.map((k) => k.nama)]}
-              value={selectedKategoriFilter}
-              onChange={(value) => {
-                setSelectedKategoriFilter(value);
-                setSelectedMateriFilter("Materi (All)"); // Reset materi filter
+            <button
+              onClick={() => {
+                resetForm();
+                setShowAddModal(true);
               }}
-            />
-            <CustomSelect
-              iconSrc="/filter_icon.svg"
-              options={[
-                "Materi (All)",
-                ...filteredMateriListFilterBar.map((m) => m.judul),
-              ]}
-              value={selectedMateriFilter}
-              onChange={setSelectedMateriFilter}
-            />
-          </div>
-
-          {/* Tombol Tambah Assignment */}
-          <button
-            onClick={() => {
-              resetForm();
-              setShowAddModal(true);
-            }}
-            className="flex items-center gap-2 bg-green-500 border border-gray-300 rounded-xl px-4 py-2 text-sm text-white hover:bg-green-600 shadow-sm transition"
-          >
-            <div className=" border-2 border-white rounded-full p-1.5 flex items-center justify-center">
-              <FaPlus className="text-white text-xs" />
-            </div>
-            Add Assignment
-          </button>
-        </section>
-
-        {/* ===== TABLE ===== */}
-        <section className="px-6 pb-6">
-          <div className="bg-white rounded-lg shadow border border-[#004220] overflow-hidden">
-            {filteredAssignments.length === 0 ? (
-              <div className="text-center py-10 text-gray-500">
-                {searchQuery
-                  ? "Tidak ada assignment yang ditemukan"
-                  : "Belum ada data assignment"}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 rounded-xl px-4 py-2 text-sm text-white shadow-sm transition"
+            >
+              <div className="border-2 border-white rounded-full p-1.5 flex items-center justify-center">
+                <FaPlus className="text-white text-xs" />
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <div className="max-h-[600px] overflow-y-auto">
-                  <table className="w-full text-sm border-collapse">
-                    <thead className="text-[#004220] border-b border-[#004220] bg-white sticky top-0 z-10">
-                      <tr>
-                        <th className="py-3 text-left px-4 bg-white">No</th>
-                        <th className="py-3 text-left px-4 bg-white">Kategori</th>
-                        <th className="py-3 text-left px-4 bg-white">Materi</th>
-                        <th className="py-3 text-center px-4 bg-white">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredAssignments.map((assignment, i) => (
-                        <tr
-                          key={assignment.id}
-                          className="text-[#004220] border-b border-[#004220] hover:bg-[#F7F9F8] transition"
-                        >
-                          <td className="py-3 px-4">{i + 1}</td>
-                          <td className="py-3 px-4">
-                            {assignment.materi?.kategori?.nama || "-"}
-                          </td>
-                          <td className="py-3 px-4">
-                            {assignment.materi?.judul || "-"}
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <div className="flex items-center justify-center gap-3">
-                              <img
-                                src="/eye_icon.svg"
-                                alt="view"
-                                className="h-5 w-5 cursor-pointer hover:opacity-70"
-                                onClick={() => handleView(assignment)}
-                              />
-                              <img
-                                src="/edit.svg"
-                                alt="edit"
-                                className="h-5 w-5 cursor-pointer hover:opacity-70"
-                                onClick={() => handleEdit(assignment)}
-                              />
-                              <img
-                                src="/delete.svg"
-                                alt="delete"
-                                className="h-5 w-5 cursor-pointer hover:opacity-70"
-                                onClick={() => handleDelete(assignment)}
-                              />
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              Add Assignment
+            </button>
+          </section>
+
+          {/* ===== TABLE ===== */}
+          <section className="pb-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-[#004220]/20 overflow-hidden">
+              {filteredAssignments.length === 0 ? (
+                <div className="text-center py-10 text-gray-500 text-sm">
+                  {searchQuery
+                    ? "Tidak ada assignment yang ditemukan"
+                    : "Belum ada data assignment"}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="overflow-x-auto">
+                  <div className="max-h-[65vh] md:max-h-[600px] overflow-y-auto">
+                    <table className="w-full text-sm border-collapse">
+                      <thead className="text-[#004220] border-b border-[#004220]/30 bg-white sticky top-0 z-10">
+                        <tr>
+                          <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                            No
+                          </th>
+                          <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                            Kategori
+                          </th>
+                          <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                            Materi
+                          </th>
+                          <th className="py-3 text-center px-4 bg-white whitespace-nowrap">
+                            Aksi
+                          </th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {filteredAssignments.map((assignment, i) => (
+                          <tr
+                            key={assignment.id}
+                            className="text-[#004220] border-b border-[#004220]/10 hover:bg-[#F7F9F8] transition"
+                          >
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              {i + 1}
+                            </td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              {assignment.materi?.kategori?.nama || "-"}
+                            </td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              {assignment.materi?.judul || "-"}
+                            </td>
+                            <td className="py-3 px-4 text-center whitespace-nowrap">
+                              <div className="flex items-center justify-center gap-4">
+                                <img
+                                  src="/eye_icon.svg"
+                                  alt="view"
+                                  className="h-5 w-5 cursor-pointer hover:opacity-70"
+                                  onClick={() => handleView(assignment)}
+                                />
+                                <img
+                                  src="/edit.svg"
+                                  alt="edit"
+                                  className="h-5 w-5 cursor-pointer hover:opacity-70"
+                                  onClick={() => handleEdit(assignment)}
+                                />
+                                <img
+                                  src="/delete.svg"
+                                  alt="delete"
+                                  className="h-5 w-5 cursor-pointer hover:opacity-70"
+                                  onClick={() => handleDelete(assignment)}
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-3 text-sm text-gray-600">
+              Menampilkan {filteredAssignments.length} dari {assignments.length}{" "}
+              assignment
+            </div>
+          </section>
+
+          <div className="text-xs text-gray-500">
+            © 2025 Universitas Muhammadiyah Yogyakarta - Asrama Unires
           </div>
-          {/* Info jumlah data */}
-          <div className="mt-3 text-sm text-gray-600">
-            Menampilkan {filteredAssignments.length} dari {assignments.length} assignment
-          </div>
-        </section>
+        </div>
       </main>
 
       {/* ===== MODAL VIEW ASSIGNMENT ===== */}
       {showViewModal && selectedAssignment && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden border border-gray-200">
-            {/* Header Modal */}
-            <div className="bg-[#004220] px-8 py-5 border-b border-gray-200">
+            <div className="bg-[#004220] px-5 sm:px-8 py-4 sm:py-5 border-b border-gray-200">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-white">
+                <h2 className="text-base sm:text-xl font-semibold text-white">
                   Detail Assignment
                 </h2>
                 <button
@@ -788,6 +824,7 @@ export default function AssignmentPage() {
                     setSelectedAssignment(null);
                   }}
                   className="text-white hover:text-gray-200 transition"
+                  aria-label="Close"
                 >
                   <svg
                     className="w-6 h-6"
@@ -806,11 +843,9 @@ export default function AssignmentPage() {
               </div>
             </div>
 
-            {/* Body Modal */}
-            <div className="p-8 overflow-y-auto max-h-[calc(90vh-180px)]">
+            <div className="p-5 sm:p-8 overflow-y-auto max-h-[calc(90vh-160px)]">
               <div className="space-y-6">
-                {/* Kategori & Materi */}
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                   <div className="border border-gray-300 rounded-md p-4 bg-gray-50">
                     <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1 block">
                       Kategori
@@ -830,7 +865,6 @@ export default function AssignmentPage() {
                   </div>
                 </div>
 
-                {/* Judul Assignment */}
                 <div className="border-l-4 border-[#004220] bg-gray-50 px-5 py-4">
                   <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2 block">
                     Judul Assignment
@@ -840,7 +874,6 @@ export default function AssignmentPage() {
                   </p>
                 </div>
 
-                {/* Pertanyaan */}
                 <div className="bg-white border border-gray-300 rounded-md p-5">
                   <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3 block">
                     Pertanyaan
@@ -850,17 +883,19 @@ export default function AssignmentPage() {
                   </p>
                 </div>
 
-                {/* Gambar Soal */}
                 {selectedAssignment.soalImageUrl && (
-                  <div className="mt-3 border border-gray-200 rounded-md p-3 bg-gray-50">
+                  <div className="border border-gray-200 rounded-md p-3 bg-gray-50">
                     <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1 block">
                       Gambar Soal
                     </label>
-                    <img src={selectedAssignment.soalImageUrl} alt="Gambar Soal" className="max-w-full max-h-60 rounded" />
+                    <img
+                      src={selectedAssignment.soalImageUrl}
+                      alt="Gambar Soal"
+                      className="max-w-full max-h-60 rounded"
+                    />
                   </div>
                 )}
 
-                {/* Pilihan Jawaban */}
                 <div>
                   <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3 block">
                     Pilihan Jawaban
@@ -873,6 +908,7 @@ export default function AssignmentPage() {
                         selectedAssignment[
                           `opsi${option}` as keyof AssignmentData
                         ];
+
                       return (
                         <div
                           key={option}
@@ -891,6 +927,7 @@ export default function AssignmentPage() {
                           >
                             {option}
                           </div>
+
                           <p
                             className={`flex-1 pt-1 ${
                               isCorrect
@@ -900,6 +937,7 @@ export default function AssignmentPage() {
                           >
                             {String(optionText)}
                           </p>
+
                           {isCorrect && (
                             <span className="text-xs font-semibold text-[#004220] bg-green-100 px-3 py-1 rounded-md">
                               ✓ BENAR
@@ -913,8 +951,7 @@ export default function AssignmentPage() {
               </div>
             </div>
 
-            {/* Footer Modal */}
-            <div className="bg-gray-50 px-8 py-4 border-t border-gray-200 flex justify-end">
+            <div className="bg-gray-50 px-5 sm:px-8 py-4 border-t border-gray-200 flex justify-end">
               <button
                 onClick={() => {
                   setShowViewModal(false);
@@ -931,24 +968,21 @@ export default function AssignmentPage() {
 
       {/* ===== MODAL TAMBAH ASSIGNMENT ===== */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
-          <div className="bg-white rounded-xl p-8 w-[420px] shadow-lg max-h-[80vh] overflow-y-auto">
-            <h2 className="text-lg font-semibold text-[#4A6FA5] mb-6">
+        <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-xl p-5 sm:p-8 w-full max-w-[520px] shadow-lg max-h-[85vh] overflow-y-auto">
+            <h2 className="text-base sm:text-lg font-semibold text-[#004220] mb-5">
               Tambah Assignment
             </h2>
 
             <div className="space-y-4">
-              {/* Kategori Dropdown */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">
                   Kategori Assignment <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={selectedKategoriForm}
-                  onChange={(e) => {
-                    setSelectedKategoriForm(e.target.value);
-                  }}
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#4A6FA5]"
+                  onChange={(e) => setSelectedKategoriForm(e.target.value)}
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#004220]"
                 >
                   <option value="">Pilih Kategori</option>
                   {kategoriList.map((k) => (
@@ -959,17 +993,16 @@ export default function AssignmentPage() {
                 </select>
               </div>
 
-              {/* Materi Dropdown */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">
                   Materi <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.materiId}
-                  onChange={(e) => {
-                    setFormData({ ...formData, materiId: e.target.value });
-                  }}
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#4A6FA5]"
+                  onChange={(e) =>
+                    setFormData({ ...formData, materiId: e.target.value })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#004220]"
                 >
                   <option value="">Pilih Materi</option>
                   {filteredMateriList.length === 0 ? (
@@ -984,7 +1017,7 @@ export default function AssignmentPage() {
                     ))
                   )}
                 </select>
-                {/* Info jika kategori belum dipilih */}
+
                 {selectedKategoriForm === "" && (
                   <p className="text-xs text-gray-500 mt-1">
                     Pilih kategori untuk filter materi (opsional)
@@ -992,7 +1025,6 @@ export default function AssignmentPage() {
                 )}
               </div>
 
-              {/* Judul Assignment */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">
                   Judul Assignment <span className="text-red-500">*</span>
@@ -1004,11 +1036,10 @@ export default function AssignmentPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, judul: e.target.value })
                   }
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#4A6FA5]"
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#004220]"
                 />
               </div>
 
-              {/* Pertanyaan */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">
                   Pertanyaan <span className="text-red-500">*</span>
@@ -1019,12 +1050,11 @@ export default function AssignmentPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, pertanyaan: e.target.value })
                   }
-                  rows={3}
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#4A6FA5]"
+                  rows={4}
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#004220] resize-none"
                 />
               </div>
 
-              {/* Upload Gambar Soal */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">
                   Gambar Soal (opsional)
@@ -1037,16 +1067,24 @@ export default function AssignmentPage() {
                 />
                 {soalImagePreview && (
                   <div className="mt-2">
-                    <img src={soalImagePreview} alt="Preview" className="max-h-40 rounded" />
+                    <img
+                      src={soalImagePreview}
+                      alt="Preview"
+                      className="max-h-40 rounded"
+                    />
                     <div className="mt-1">
-                      <button onClick={removeImageSelection} className="text-red-600 text-sm">Hapus Gambar</button>
+                      <button
+                        onClick={removeImageSelection}
+                        className="text-red-600 text-sm"
+                      >
+                        Hapus Gambar
+                      </button>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Opsi A-D */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     Opsi A <span className="text-red-500">*</span>
@@ -1058,9 +1096,10 @@ export default function AssignmentPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, opsiA: e.target.value })
                     }
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#4A6FA5]"
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#004220]"
                   />
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     Opsi B <span className="text-red-500">*</span>
@@ -1072,9 +1111,10 @@ export default function AssignmentPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, opsiB: e.target.value })
                     }
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#4A6FA5]"
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#004220]"
                   />
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     Opsi C <span className="text-red-500">*</span>
@@ -1086,9 +1126,10 @@ export default function AssignmentPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, opsiC: e.target.value })
                     }
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#4A6FA5]"
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#004220]"
                   />
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     Opsi D <span className="text-red-500">*</span>
@@ -1100,12 +1141,11 @@ export default function AssignmentPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, opsiD: e.target.value })
                     }
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#4A6FA5]"
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#004220]"
                   />
                 </div>
               </div>
 
-              {/* Jawaban Benar */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">
                   Jawaban Benar <span className="text-red-500">*</span>
@@ -1115,7 +1155,7 @@ export default function AssignmentPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, jawabanBenar: e.target.value })
                   }
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#4A6FA5]"
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#004220]"
                 >
                   <option value="A">A</option>
                   <option value="B">B</option>
@@ -1124,7 +1164,7 @@ export default function AssignmentPage() {
                 </select>
               </div>
 
-              {/* Soal Inputs (UI Legacy - bisa di-hide atau disesuaikan) */}
+              {/* Legacy hidden */}
               <div className="hidden">
                 <label className="block text-sm font-medium text-gray-700">
                   Soal <span className="text-red-500">*</span>
@@ -1137,7 +1177,7 @@ export default function AssignmentPage() {
                       handleChangeQuestion(index, e.target.value)
                     }
                     placeholder={`${index + 1}.`}
-                    className="mt-2 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#4A6FA5]"
+                    className="mt-2 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                   />
                 ))}
                 <button
@@ -1150,19 +1190,18 @@ export default function AssignmentPage() {
               </div>
             </div>
 
-            {/* Buttons */}
-            <div className="flex justify-end gap-3 mt-6">
+            <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6">
               <button
                 onClick={() => {
                   setShowAddModal(false);
                   resetForm();
                 }}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-100"
+                className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-100"
               >
                 Cancel
               </button>
               <button
-                className="px-4 py-2 bg-[#4A6FA5] text-white rounded-lg text-sm hover:bg-[#3b5c8a]"
+                className="w-full sm:w-auto px-4 py-2 bg-[#004220] text-white rounded-lg text-sm hover:bg-[#003318]"
                 onClick={handleSubmitAdd}
               >
                 Save
@@ -1174,12 +1213,11 @@ export default function AssignmentPage() {
 
       {/* ===== MODAL EDIT ===== */}
       {showEditModal && selectedAssignment && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 p-4">
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden border border-gray-200">
-            {/* Header Modal */}
-            <div className="bg-[#004220] px-8 py-5 border-b border-gray-200">
+            <div className="bg-[#004220] px-5 sm:px-8 py-4 sm:py-5 border-b border-gray-200">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-white">
+                <h2 className="text-base sm:text-xl font-semibold text-white">
                   Edit Assignment
                 </h2>
                 <button
@@ -1189,6 +1227,7 @@ export default function AssignmentPage() {
                     resetForm();
                   }}
                   className="text-white hover:text-gray-200 transition"
+                  aria-label="Close"
                 >
                   <svg
                     className="w-6 h-6"
@@ -1207,11 +1246,9 @@ export default function AssignmentPage() {
               </div>
             </div>
 
-            {/* Body Modal */}
-            <div className="p-8 overflow-y-auto max-h-[calc(90vh-180px)]">
+            <div className="p-5 sm:p-8 overflow-y-auto max-h-[calc(90vh-160px)]">
               <div className="space-y-5">
-                {/* Kategori & Materi */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Kategori <span className="text-red-500">*</span>
@@ -1257,7 +1294,6 @@ export default function AssignmentPage() {
                   </div>
                 </div>
 
-                {/* Judul Assignment */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Judul Assignment <span className="text-red-500">*</span>
@@ -1273,7 +1309,6 @@ export default function AssignmentPage() {
                   />
                 </div>
 
-                {/* Pertanyaan */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Pertanyaan <span className="text-red-500">*</span>
@@ -1284,14 +1319,15 @@ export default function AssignmentPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, pertanyaan: e.target.value })
                     }
-                    rows={3}
+                    rows={4}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#004220] focus:border-[#004220] transition resize-none"
                   />
                 </div>
 
-                {/* Upload Gambar Soal (Edit) */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Gambar Soal (opsional)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Gambar Soal (opsional)
+                  </label>
                   <input
                     type="file"
                     accept="image/*"
@@ -1300,20 +1336,28 @@ export default function AssignmentPage() {
                   />
                   {soalImagePreview && (
                     <div className="mt-2">
-                      <img src={soalImagePreview} alt="Preview" className="max-h-40 rounded" />
+                      <img
+                        src={soalImagePreview}
+                        alt="Preview"
+                        className="max-h-40 rounded"
+                      />
                       <div className="mt-1">
-                        <button onClick={removeImageSelection} className="text-red-600 text-sm">Hapus Gambar</button>
+                        <button
+                          onClick={removeImageSelection}
+                          className="text-red-600 text-sm"
+                        >
+                          Hapus Gambar
+                        </button>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Pilihan Jawaban */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-3">
                     Pilihan Jawaban <span className="text-red-500">*</span>
                   </label>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {["A", "B", "C", "D"].map((option) => (
                       <div key={option}>
                         <label className="block text-xs font-medium text-gray-600 mb-1.5">
@@ -1331,7 +1375,7 @@ export default function AssignmentPage() {
                             setFormData({
                               ...formData,
                               [`opsi${option}`]: e.target.value,
-                            })
+                            } as FormData)
                           }
                           className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#004220] focus:border-[#004220] transition"
                         />
@@ -1340,7 +1384,6 @@ export default function AssignmentPage() {
                   </div>
                 </div>
 
-                {/* Jawaban Benar */}
                 <div className="bg-green-50 border border-[#004220] rounded-md p-4">
                   <label className="block text-sm font-semibold text-[#004220] mb-2">
                     Jawaban Benar <span className="text-red-500">*</span>
@@ -1361,21 +1404,20 @@ export default function AssignmentPage() {
               </div>
             </div>
 
-            {/* Footer Modal */}
-            <div className="bg-gray-50 px-8 py-4 border-t border-gray-200 flex justify-end gap-3">
+            <div className="bg-gray-50 px-5 sm:px-8 py-4 border-t border-gray-200 flex flex-col sm:flex-row justify-end gap-3">
               <button
                 onClick={() => {
                   setShowEditModal(false);
                   setSelectedAssignment(null);
                   resetForm();
                 }}
-                className="px-5 py-2 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-medium rounded-md transition"
+                className="w-full sm:w-auto px-5 py-2 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-medium rounded-md transition"
               >
                 Batal
               </button>
               <button
                 onClick={handleSubmitEdit}
-                className="px-5 py-2 bg-[#004220] hover:bg-[#003318] text-white font-medium rounded-md transition"
+                className="w-full sm:w-auto px-5 py-2 bg-[#004220] hover:bg-[#003318] text-white font-medium rounded-md transition"
               >
                 Simpan Perubahan
               </button>
@@ -1386,8 +1428,8 @@ export default function AssignmentPage() {
 
       {/* ===== MODAL DELETE ===== */}
       {showDeleteModal && selectedAssignment && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-[350px] text-center">
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-[380px] text-center">
             <h2 className="text-lg font-semibold text-[#004220] mb-4">
               Hapus Assignment?
             </h2>
@@ -1395,9 +1437,9 @@ export default function AssignmentPage() {
               Apakah kamu yakin ingin menghapus{" "}
               <span className="font-semibold">{selectedAssignment.judul}</span>?
             </p>
-            <div className="flex justify-center gap-4">
+            <div className="flex flex-col sm:flex-row justify-center gap-3">
               <button
-                className="px-4 py-2 bg-gray-300 rounded-md hover:bg-gray-400"
+                className="w-full sm:w-auto px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300"
                 onClick={() => {
                   setShowDeleteModal(false);
                   setSelectedAssignment(null);
@@ -1406,7 +1448,7 @@ export default function AssignmentPage() {
                 Batal
               </button>
               <button
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
                 onClick={handleConfirmDelete}
               >
                 Hapus

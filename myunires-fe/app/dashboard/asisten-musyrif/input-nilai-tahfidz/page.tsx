@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import { FaSearch, FaPlus } from "react-icons/fa";
-import Sidebar from "@/components/Sidebar";
 import Swal from "sweetalert2";
 import { apiGet, apiPost, clearAuth } from "@/lib/api";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+
+import Sidebar_AsistenMusyrif from "@/components/sidebar_asistenMusyrif";
 
 interface NilaiTahfidzData {
   id: number;
@@ -44,9 +45,14 @@ interface TargetHafalan {
 
 export default function InputNilaiTahfidzPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // sidebar states
   const [isOpen, setIsOpen] = useState(true);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const toggleSidebar = () => setIsOpen((prev) => !prev);
+
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Data states
@@ -64,9 +70,11 @@ export default function InputNilaiTahfidzPage() {
   // Modal states
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<"add" | "edit">("add");
-  const [selectedNilai, setSelectedNilai] = useState<NilaiTahfidzData | null>(null);
+  const [selectedNilai, setSelectedNilai] = useState<NilaiTahfidzData | null>(
+    null
+  );
 
-  // Form states untuk modal [web:22][web:24]
+  // Form states
   const [formResidentId, setFormResidentId] = useState<number | null>(null);
   const [formTargetId, setFormTargetId] = useState<number | null>(null);
   const [formStatus, setFormStatus] = useState<string>("");
@@ -76,30 +84,52 @@ export default function InputNilaiTahfidzPage() {
     fetchAllData();
   }, []);
 
-  // Reset form saat modal dibuka
+  // Auto-set residentId from query param: ?residentId=123
   useEffect(() => {
-    if (showModal) {
-      if (modalMode === "add") {
-        setFormResidentId(null);
-        setFormTargetId(null);
-        setFormStatus("");
-        setFormNilaiHuruf("");
-      }
+    const q = searchParams.get("residentId");
+    if (!q) return;
+    const id = Number(q);
+    if (!Number.isFinite(id)) return;
+
+    // set default resident untuk modal tambah
+    setFormResidentId(id);
+
+    // optional: filter list berdasarkan resident (biar langsung fokus)
+    setSearchTerm("");
+  }, [searchParams]);
+
+  // Reset form saat modal dibuka (mode add)
+  useEffect(() => {
+    if (!showModal) return;
+
+    if (modalMode === "add") {
+      // kalau ada query residentId, jangan di-reset
+      const q = searchParams.get("residentId");
+      const qId = q ? Number(q) : null;
+
+      setFormResidentId(Number.isFinite(qId as any) ? (qId as number) : null);
+      setFormTargetId(null);
+      setFormStatus("");
+      setFormNilaiHuruf("");
     }
-  }, [showModal, modalMode]);
+  }, [showModal, modalMode, searchParams]);
 
   const handleFilter = (search: string, usroh: string) => {
     let result = [...nilaiList];
+
     if (search) {
+      const s = search.toLowerCase();
       result = result.filter(
         (item) =>
-          item.resident.toLowerCase().includes(search.toLowerCase()) ||
-          item.nim.toLowerCase().includes(search.toLowerCase())
+          item.resident.toLowerCase().includes(s) ||
+          item.nim.toLowerCase().includes(s)
       );
     }
+
     if (usroh !== "all") {
       result = result.filter((item) => item.usrohId === Number(usroh));
     }
+
     setFilteredData(result);
     setSearchTerm(search);
     setSelectedUsroh(usroh);
@@ -120,9 +150,22 @@ export default function InputNilaiTahfidzPage() {
       const targetRes = await apiGet<any>("/api/asisten/target-hafalan");
       const targetData = targetRes.data ?? [];
 
-      setNilaiList(Array.isArray(nilaiData) ? nilaiData : []);
-      setFilteredData(Array.isArray(nilaiData) ? nilaiData : []);
-      setResidents(Array.isArray(residentsData) ? residentsData : []);
+      const nilaiArr = Array.isArray(nilaiData) ? nilaiData : [];
+
+      // mapping aman: API kadang kirim `name`, di sini kita pakai `nama`
+      const residentArr: Resident[] = (
+        Array.isArray(residentsData) ? residentsData : []
+      ).map((r: any) => ({
+        id: r.id,
+        nama: r.nama ?? r.name ?? "",
+        nim: r.nim ?? "",
+        email: r.email ?? "",
+        usroh: r.usroh ?? "-",
+      }));
+
+      setNilaiList(nilaiArr);
+      setFilteredData(nilaiArr);
+      setResidents(residentArr);
       setUsrohList(Array.isArray(usrohData) ? usrohData : []);
       setTargetHafalan(Array.isArray(targetData) ? targetData : []);
     } catch (error) {
@@ -138,11 +181,13 @@ export default function InputNilaiTahfidzPage() {
   };
 
   const handleViewDetail = (nilai: NilaiTahfidzData) => {
-    const tanggal = new Date(nilai.tanggal || "").toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
+    const tanggal = nilai.tanggal
+      ? new Date(nilai.tanggal).toLocaleDateString("id-ID", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        })
+      : "-";
 
     Swal.fire({
       title: "Detail Nilai Tahfidz",
@@ -155,39 +200,14 @@ export default function InputNilaiTahfidzPage() {
             <p><strong>Email:</strong> ${nilai.email}</p>
             <p><strong>Usroh:</strong> ${nilai.usroh || "-"}</p>
           </div>
-          
           <div>
             <h3 class="font-bold text-lg mb-2">Nilai Tahfidz</h3>
             <p><strong>Target Hafalan:</strong> ${nilai.target || "-"}</p>
             <p><strong>Surah:</strong> ${nilai.surah || "-"}</p>
-            <p><strong>Status:</strong> 
-              <span class="px-2 py-1 rounded text-xs font-semibold ml-2 ${
-                nilai.status === "SELESAI"
-                  ? "bg-green-100 text-green-700"
-                  : nilai.status === "BELUM SELESAI"
-                  ? "bg-blue-100 text-blue-800"
-                  : "bg-yellow-100 text-yellow-800"
-              }">
-                ${nilai.status || "-"}
-              </span>
-            </p>
-            <p><strong>Nilai Huruf:</strong> 
-              <span class="px-2 py-1 rounded text-xs font-semibold ml-2 ${
-                nilai.nilaiHuruf === "A" || nilai.nilaiHuruf === "A-"
-                  ? "bg-green-100 text-green-800"
-                  : nilai.nilaiHuruf?.startsWith("B")
-                  ? "bg-blue-100 text-blue-800"
-                  : nilai.nilaiHuruf?.startsWith("C")
-                  ? "bg-yellow-100 text-yellow-800"
-                  : nilai.nilaiHuruf === "D"
-                  ? "bg-orange-100 text-orange-800"
-                  : nilai.nilaiHuruf === "E"
-                  ? "bg-red-100 text-red-800"
-                  : "bg-gray-100 text-gray-800"
-              }">
-                ${nilai.nilaiHuruf || "Belum Dinilai"}
-              </span>
-            </p>
+            <p><strong>Status:</strong> ${nilai.status || "-"}</p>
+            <p><strong>Nilai Huruf:</strong> ${
+              nilai.nilaiHuruf || "Belum Dinilai"
+            }</p>
             <p><strong>Tanggal Penilaian:</strong> ${tanggal}</p>
           </div>
         </div>
@@ -197,8 +217,11 @@ export default function InputNilaiTahfidzPage() {
     });
   };
 
+  const handleImportClick = () => fileInputRef.current?.click();
+
   const handleFileUpload = async (file: File) => {
     if (!file) return;
+
     if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
       Swal.fire({
         icon: "error",
@@ -207,17 +230,19 @@ export default function InputNilaiTahfidzPage() {
       });
       return;
     }
+
     try {
       const formData = new FormData();
       formData.append("file", file);
+
       const response = await fetch("/api/asisten/tahfidz/import", {
         method: "POST",
         body: formData,
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
+
       const result = await response.json();
+
       if (response.ok) {
         Swal.fire({
           icon: "success",
@@ -251,13 +276,7 @@ export default function InputNilaiTahfidzPage() {
     }
   };
 
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  // Handler untuk simpan nilai tahfidz
   const handleSaveNilai = async () => {
-    // Validasi input [web:24]
     if (!formResidentId || !formTargetId || !formStatus || !formNilaiHuruf) {
       Swal.fire({
         icon: "error",
@@ -282,7 +301,7 @@ export default function InputNilaiTahfidzPage() {
         title: "Berhasil!",
         text: "Nilai tahfidz berhasil disimpan.",
         confirmButtonColor: "#22c55e",
-        timer: 2000,
+        timer: 1600,
       });
 
       setShowModal(false);
@@ -292,38 +311,57 @@ export default function InputNilaiTahfidzPage() {
       Swal.fire({
         icon: "error",
         title: "Gagal Menyimpan",
-        text: err?.response?.data?.message || "Terjadi kesalahan saat menyimpan nilai.",
+        text: err?.message || "Terjadi kesalahan saat menyimpan nilai.",
       });
     }
   };
 
   return (
-    <div className="min-h-screen flex bg-white">
-      {/* ===== HEADER ===== */}
-      <header className="fixed top-0 left-0 right-0 bg-white z-30 h-16 flex items-center justify-between px-6 border-b">
+    <div className="min-h-screen bg-[#F5F5F5]">
+      {/* TOP HEADER */}
+      <header className="fixed top-0 left-0 right-0 bg-white z-30 h-16 flex items-center justify-between px-4 sm:px-6 border-b">
         <div className="flex items-center gap-3">
-          <img src="/lg_umy.svg" alt="UMY" className="h-10 object-contain" />
-          <img src="/lg_unires.svg" alt="UNIRES" className="h-10 object-contain" />
+          <button
+            type="button"
+            onClick={() => setMobileOpen(true)}
+            className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+            aria-label="Open menu"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M4 6h16M4 12h16M4 18h16"
+                stroke="#0D6B44"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+
+          <img
+            src="/lg_umy.svg"
+            alt="UMY"
+            className="h-7 sm:h-8 w-auto object-contain shrink-0"
+          />
+          <img
+            src="/lg_unires.svg"
+            alt="UNIRES"
+            className="h-7 sm:h-8 w-auto object-contain shrink-0"
+          />
         </div>
-        <button
-          onClick={() => setShowLogoutModal(true)}
-          className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-md transition"
-        >
-          Logout
-        </button>
       </header>
 
-      {/* ===== LOGOUT MODAL ===== */}
+      {/* LOGOUT MODAL */}
       {showLogoutModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-white/90 z-50">
-          <div className="bg-[#d1d4d0] rounded-3xl shadow-lg p-8 w-[400px] text-center">
-            <h2 className="text-2xl font-semibold text-[#004220] mb-4">Log Out</h2>
-            <p className="text-gray-700 text-sm mb-1">Tindakan ini akan mengakhiri sesi login Anda.</p>
-            <p className="text-gray-700 text-sm mb-6">Apakah Anda ingin melanjutkan?</p>
-            <div className="flex justify-center gap-4">
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-sm text-center">
+            <h2 className="text-xl font-semibold text-[#004220] mb-3">
+              Log Out
+            </h2>
+            <p className="text-gray-600 text-sm mb-6">Akhiri sesi login?</p>
+            <div className="flex justify-center gap-3">
               <button
                 onClick={() => setShowLogoutModal(false)}
-                className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded-md transition"
+                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg"
               >
                 Batal
               </button>
@@ -332,7 +370,7 @@ export default function InputNilaiTahfidzPage() {
                   clearAuth();
                   window.location.href = "/login";
                 }}
-                className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-md transition"
+                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"
               >
                 Log Out
               </button>
@@ -341,153 +379,213 @@ export default function InputNilaiTahfidzPage() {
         </div>
       )}
 
-      {/* ===== SIDEBAR ===== */}
-      <Sidebar isOpen={isOpen} toggleSidebar={toggleSidebar} />
+      {/* SIDEBAR */}
+      <Sidebar_AsistenMusyrif
+        isOpen={isOpen}
+        toggleSidebar={toggleSidebar}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
+      />
 
-      {/* ===== MAIN CONTENT ===== */}
-      <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${isOpen ? "ml-64" : "ml-12"}`}>
-        <div className="h-16" />
+      {/* MAIN */}
+      <main
+        className={[
+          "pt-16 transition-all duration-300",
+          isOpen ? "md:ml-64" : "md:ml-14",
+          "ml-0",
+        ].join(" ")}
+      >
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-4 sm:py-6">
+          <header className="mb-4">
+            <h1 className="bg-[#004220] text-white text-center py-4 sm:py-5 rounded-2xl text-base sm:text-lg font-semibold shadow-sm">
+              Nilai Tahfidz
+            </h1>
+          </header>
 
-        <header className="px-6 py-4">
-          <h1 className="bg-[#004220] text-white text-center py-6 rounded-md text-lg font-semibold">Nilai Tahfidz</h1>
-        </header>
+          {/* FILTER BAR */}
+          <section className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-5">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="relative w-full sm:w-[280px]">
+                <FaSearch
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  size={16}
+                />
+                <input
+                  type="text"
+                  placeholder="Cari Resident (nama/NIM)"
+                  value={searchTerm}
+                  onChange={(e) => handleFilter(e.target.value, selectedUsroh)}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#004220]"
+                />
+              </div>
 
-        {/* ===== FILTER BAR ===== */}
-        <section className="flex flex-wrap items-center justify-between px-6 mb-5 gap-3">
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Search Input */}
-            <div className="relative">
-              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <select
+                value={selectedUsroh}
+                onChange={(e) => handleFilter(searchTerm, e.target.value)}
+                className="w-full sm:w-[220px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#004220]"
+              >
+                <option value="all">Usroh (All)</option>
+                {usrohList.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.nama}
+                  </option>
+                ))}
+              </select>
+
               <input
-                type="text"
-                placeholder="Cari Resident"
-                value={searchTerm}
-                onChange={(e) => handleFilter(e.target.value, selectedUsroh)}
-                className="pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#004220]"
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileUpload(file);
+                }}
+                className="hidden"
               />
+              <button
+                onClick={handleImportClick}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm"
+              >
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M12 3v12m0 0l-3-3m3 3l3-3M5 21h14" />
+                </svg>
+                Impor Data
+              </button>
             </div>
 
-            {/* Usroh Filter */}
-            <select
-              value={selectedUsroh}
-              onChange={(e) => handleFilter(searchTerm, e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#004220]"
-            >
-              <option value="all">Usroh (All)</option>
-              {usrohList.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.nama}
-                </option>
-              ))}
-            </select>
-
-            {/* Import Button */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleFileUpload(file);
-              }}
-              className="hidden"
-            />
             <button
-              onClick={handleImportClick}
-              className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm"
+              onClick={() => {
+                setModalMode("add");
+                setSelectedNilai(null);
+                setShowModal(true);
+              }}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#004220] text-white px-4 py-2 rounded-lg hover:bg-[#003318] transition font-semibold text-sm"
             >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 3v12m0 0l-3-3m3 3l3-3M5 21h14" />
-              </svg>
-              Impor Data
+              <FaPlus size={16} />
+              Add Nilai
             </button>
-          </div>
+          </section>
 
-          {/* Add Button */}
-          <button
-            onClick={() => {
-              setModalMode("add");
-              setSelectedNilai(null);
-              setShowModal(true);
-            }}
-            className="flex items-center gap-2 bg-[#004220] text-white px-4 py-2 rounded-lg hover:bg-[#003318] transition font-semibold text-sm"
-          >
-            <FaPlus size={16} />
-            Add Nilai
-          </button>
-        </section>
-
-        {/* ===== TABLE ===== */}
-        <section className="px-6 pb-6">
-          <div className="bg-white rounded-lg shadow border border-[#004220] overflow-hidden">
-            {loading ? (
-              <div className="text-center py-10 text-gray-500">Memuat data...</div>
-            ) : filteredData.length === 0 ? (
-              <div className="text-center py-10 text-gray-500">Tidak ada data tahfidz</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <div className="max-h-[600px] overflow-y-auto">
-                  <table className="w-full text-sm border-collapse">
-                    <thead className="text-[#004220] border-b border-[#004220] bg-white sticky top-0 z-10">
-                      <tr>
-                        <th className="py-3 text-left px-4 bg-white">No</th>
-                        <th className="py-3 text-left px-4 bg-white">Nama</th>
-                        <th className="py-3 text-left px-4 bg-white">NIM</th>
-                        <th className="py-3 text-left px-4 bg-white">Usroh</th>
-                        <th className="py-3 text-left px-4 bg-white">Target Hafalan</th>
-                        <th className="py-3 text-left px-4 bg-white">Surah</th>
-                        <th className="py-3 text-left px-4 bg-white">Nilai Huruf</th>
-                        <th className="py-3 text-center px-4 bg-white">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredData.map((nilai, i) => (
-                        <tr
-                          key={nilai.id}
-                          className="text-[#004220] border-b border-[#004220] hover:bg-[#F7F9F8] transition"
-                        >
-                          <td className="py-3 px-4">{i + 1}</td>
-                          <td className="py-3 px-4">{nilai.resident}</td>
-                          <td className="py-3 px-4">{nilai.nim}</td>
-                          <td className="py-3 px-4">{nilai.usroh || "-"}</td>
-                          <td className="py-3 px-4">{nilai.target || "-"}</td>
-                          <td className="py-3 px-4">{nilai.surah || "-"}</td>
-                          <td className="py-3 px-4">{nilai.nilaiHuruf || "-"}</td>
-                          <td className="py-3 px-4 text-center">
-                            <button
-                              onClick={() => handleViewDetail(nilai)}
-                              className="flex items-center gap-2 bg-[#004220] text-white px-4 py-2 rounded-lg hover:bg-[#005a2c] transition text-xs font-semibold justify-center"
-                            >
-                              Lihat Detail
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+          {/* TABLE */}
+          <section className="pb-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              {loading ? (
+                <div className="text-center py-10 text-gray-500 text-sm">
+                  Memuat data...
                 </div>
-              </div>
-            )}
-          </div>
-          <div className="mt-3 text-sm text-gray-600">
-            Menampilkan {filteredData.length} dari {nilaiList.length} data tahfidz
-          </div>
-        </section>
+              ) : filteredData.length === 0 ? (
+                <div className="text-center py-10 text-gray-500 text-sm">
+                  Tidak ada data tahfidz
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <div className="max-h-[65vh] overflow-y-auto">
+                    <table className="w-full text-sm border-collapse">
+                      <thead className="text-[#004220] border-b border-gray-200 bg-white sticky top-0 z-10">
+                        <tr>
+                          <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                            No
+                          </th>
+                          <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                            Nama
+                          </th>
+                          <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                            NIM
+                          </th>
+                          <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                            Usroh
+                          </th>
+                          <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                            Target Hafalan
+                          </th>
+                          <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                            Surah
+                          </th>
+                          <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                            Nilai Huruf
+                          </th>
+                          <th className="py-3 text-center px-4 bg-white whitespace-nowrap">
+                            Aksi
+                          </th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {filteredData.map((nilai, i) => (
+                          <tr
+                            key={nilai.id}
+                            className="text-[#004220] border-b border-gray-100 hover:bg-[#F7F9F8] transition"
+                          >
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              {i + 1}
+                            </td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              {nilai.resident}
+                            </td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              {nilai.nim}
+                            </td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              {nilai.usroh || "-"}
+                            </td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              {nilai.target || "-"}
+                            </td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              {nilai.surah || "-"}
+                            </td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              {nilai.nilaiHuruf || "-"}
+                            </td>
+                            <td className="py-3 px-4 text-center whitespace-nowrap">
+                              <button
+                                onClick={() => handleViewDetail(nilai)}
+                                className="bg-[#004220] text-white px-4 py-2 rounded-lg hover:bg-[#005a2c] transition text-xs font-semibold"
+                              >
+                                Lihat Detail
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-3 text-sm text-gray-600">
+              Menampilkan {filteredData.length} dari {nilaiList.length} data
+              tahfidz
+            </div>
+
+            <div className="mt-4 text-xs text-gray-500">
+              © 2025 Universitas Muhammadiyah Yogyakarta - Asrama Unires
+            </div>
+          </section>
+        </div>
       </main>
 
-      {/* ===== MODAL: Add/Edit Nilai Tahfidz ===== */}
+      {/* MODAL ADD */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden border border-gray-200">
-            <div className="bg-[#004220] px-8 py-5 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-white">
-                {modalMode === "add" ? "Tambah Nilai Tahfidz" : "Edit Nilai Tahfidz"}
+        <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden border border-gray-200">
+            <div className="bg-[#004220] px-6 sm:px-8 py-5 border-b border-gray-200">
+              <h2 className="text-lg sm:text-xl font-semibold text-white">
+                {modalMode === "add"
+                  ? "Tambah Nilai Tahfidz"
+                  : "Edit Nilai Tahfidz"}
               </h2>
             </div>
 
-            <div className="p-8 overflow-y-auto max-h-[calc(90vh-150px)]">
+            <div className="p-6 sm:p-8 overflow-y-auto max-h-[calc(90vh-150px)]">
               <div className="space-y-5">
-                {/* Resident Selection */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     Resident <span className="text-red-500">*</span>
@@ -495,7 +593,9 @@ export default function InputNilaiTahfidzPage() {
                   <select
                     className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#004220]"
                     value={formResidentId || ""}
-                    onChange={(e) => setFormResidentId(Number(e.target.value) || null)}
+                    onChange={(e) =>
+                      setFormResidentId(Number(e.target.value) || null)
+                    }
                   >
                     <option value="">Pilih Resident</option>
                     {residents.map((r) => (
@@ -506,7 +606,6 @@ export default function InputNilaiTahfidzPage() {
                   </select>
                 </div>
 
-                {/* Target Hafalan Selection */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     Target Hafalan <span className="text-red-500">*</span>
@@ -514,7 +613,9 @@ export default function InputNilaiTahfidzPage() {
                   <select
                     className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#004220]"
                     value={formTargetId || ""}
-                    onChange={(e) => setFormTargetId(Number(e.target.value) || null)}
+                    onChange={(e) =>
+                      setFormTargetId(Number(e.target.value) || null)
+                    }
                   >
                     <option value="">Pilih Target Hafalan</option>
                     {targetHafalan.map((t) => (
@@ -525,7 +626,6 @@ export default function InputNilaiTahfidzPage() {
                   </select>
                 </div>
 
-                {/* Status Selection */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     Status <span className="text-red-500">*</span>
@@ -542,7 +642,6 @@ export default function InputNilaiTahfidzPage() {
                   </select>
                 </div>
 
-                {/* Nilai Huruf Selection */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     Nilai Huruf <span className="text-red-500">*</span>
@@ -567,7 +666,7 @@ export default function InputNilaiTahfidzPage() {
               </div>
             </div>
 
-            <div className="bg-gray-50 px-8 py-4 border-t border-gray-200 flex justify-end gap-3">
+            <div className="bg-gray-50 px-6 sm:px-8 py-4 border-t border-gray-200 flex justify-end gap-3">
               <button
                 onClick={() => setShowModal(false)}
                 className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100"

@@ -3,7 +3,15 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { FaPlus, FaSearch } from "react-icons/fa";
 import { useAuth } from "@/lib/useAuth";
-import { getUser, clearAuth, apiGet, apiPost, apiPut, apiDelete, apiUpload} from "@/lib/api";
+import {
+  getUser,
+  clearAuth,
+  apiGet,
+  apiPost,
+  apiPut,
+  apiDelete,
+  apiUpload,
+} from "@/lib/api";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
 import AdminSidebar from "@/components/adminSidebar";
@@ -48,11 +56,14 @@ export default function AdminResidentPage() {
   // Modal add/edit
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<"add" | "edit">("add");
-  const [selectedResident, setSelectedResident] = useState<ResidentListItem | null>(null);
+  const [selectedResident, setSelectedResident] =
+    useState<ResidentListItem | null>(null);
 
   // Modal detail
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [detailResident, setDetailResident] = useState<ResidentListItem | null>(null);
+  const [detailResident, setDetailResident] = useState<ResidentListItem | null>(
+    null
+  );
 
   // Modal import
   const [showImportModal, setShowImportModal] = useState(false);
@@ -113,7 +124,11 @@ export default function AdminResidentPage() {
       setResidents(Array.isArray(resResident.data) ? resResident.data : []);
       setUsrohList(Array.isArray(resUsroh.data) ? resUsroh.data : []);
     } catch (err: any) {
-      Swal.fire({ icon: "error", title: "Error", text: "Gagal memuat data resident." });
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Gagal memuat data resident.",
+      });
     } finally {
       setLoading(false);
     }
@@ -190,23 +205,32 @@ export default function AdminResidentPage() {
     try {
       if (modalMode === "add") {
         await apiPost("/api/admin/resident", payload);
-        Swal.fire({ icon: "success", title: "Berhasil!", text: "Resident ditambahkan.", timer: 2000 });
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil!",
+          text: "Resident ditambahkan.",
+          timer: 2000,
+        });
       } else if (selectedResident) {
         await apiPut(`/api/admin/resident/${selectedResident.id}`, payload);
-        Swal.fire({ icon: "success", title: "Berhasil!", text: "Resident diupdate.", timer: 2000 });
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil!",
+          text: "Resident diupdate.",
+          timer: 2000,
+        });
       }
 
       setShowModal(false);
       fetchData();
-    }  catch (err: any) {
-  console.log("ERR", err?.response?.data);
-  Swal.fire({
-    icon: "error",
-    title: "Gagal",
-    text: err?.response?.data?.message || "Terjadi kesalahan.",
-  });
-}
-
+    } catch (err: any) {
+      console.log("ERR", err?.response?.data);
+      Swal.fire({
+        icon: "error",
+        title: "Gagal",
+        text: err?.response?.data?.message || "Terjadi kesalahan.",
+      });
+    }
   };
 
   const handleDelete = async (resident: ResidentListItem) => {
@@ -225,45 +249,62 @@ export default function AdminResidentPage() {
 
     try {
       await apiDelete(`/api/admin/resident/${resident.id}`);
-      Swal.fire({ icon: "success", title: "Terhapus!", text: "Resident berhasil dihapus.", timer: 2000 });
+      Swal.fire({
+        icon: "success",
+        title: "Terhapus!",
+        text: "Resident berhasil dihapus.",
+        timer: 2000,
+      });
       setShowDetailModal(false);
       setDetailResident(null);
       fetchData();
     } catch (err: any) {
-      Swal.fire({ icon: "error", title: "Error", text: "Gagal menghapus resident." });
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Gagal menghapus resident.",
+      });
     }
   };
 
   const handleImportExcel = async () => {
-  try {
-    if (!importFile) {
-      Swal.fire({ icon: "error", title: "Validasi", text: "Pilih file Excel dulu." });
-      return;
+    try {
+      if (!importFile) {
+        Swal.fire({
+          icon: "error",
+          title: "Validasi",
+          text: "Pilih file Excel dulu.",
+        });
+        return;
+      }
+
+      setImportLoading(true);
+
+      const fd = new FormData();
+      fd.append("file", importFile); // harus sama dengan upload.single("file")
+
+      const json = await apiUpload<any>("/api/admin/resident/import", fd);
+
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil",
+        text: json?.message || "Import berhasil",
+        timer: 2000,
+      });
+
+      setShowImportModal(false);
+      setImportFile(null);
+      fetchData();
+    } catch (err: any) {
+      Swal.fire({
+        icon: "error",
+        title: "Gagal",
+        text: err?.message || "Terjadi kesalahan.",
+      });
+    } finally {
+      setImportLoading(false);
     }
-
-    setImportLoading(true);
-
-    const fd = new FormData();
-    fd.append("file", importFile); // harus sama dengan upload.single("file")
-
-    const json = await apiUpload<any>("/api/admin/resident/import", fd);
-
-    Swal.fire({ icon: "success", title: "Berhasil", text: json?.message || "Import berhasil", timer: 2000 });
-
-    setShowImportModal(false);
-    setImportFile(null);
-    fetchData();
-  } catch (err: any) {
-    Swal.fire({
-      icon: "error",
-      title: "Gagal",
-      text: err?.message || "Terjadi kesalahan.",
-    });
-  } finally {
-    setImportLoading(false);
-  }
-};
-
+  };
 
   if (!user) return null;
 
@@ -276,21 +317,16 @@ export default function AdminResidentPage() {
             <img src="/lg_umy.svg" alt="UMY" className="h-8" />
             <img src="/lg_unires.svg" alt="UNIRES" className="h-8" />
           </div>
-
-          <button
-            onClick={() => setShowLogoutModal(true)}
-            className="bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2 rounded-full text-xs shadow transition"
-          >
-            Log Out
-          </button>
         </div>
       </header>
 
       {/* Logout modal */}
       {showLogoutModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl p-8 w-[360px] text-center">
-            <h2 className="text-xl font-semibold text-[#004220] mb-3">Log Out</h2>
+        <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 w-full max-w-sm text-center">
+            <h2 className="text-xl font-semibold text-[#004220] mb-3">
+              Log Out
+            </h2>
             <p className="text-gray-600 text-sm mb-6">Akhiri sesi login?</p>
             <div className="flex justify-center gap-3">
               <button
@@ -311,8 +347,12 @@ export default function AdminResidentPage() {
       )}
 
       {/* BODY */}
-      <div className="mx-auto max-w-7xl px-6 py-6 flex gap-6">
-        <AdminSidebar userName={userData?.name} userEmail={userData?.email} />
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 py-4 sm:py-6 flex flex-col md:flex-row gap-4 md:gap-6">
+        <AdminSidebar
+          userName={userData?.name}
+          userEmail={userData?.email}
+          onLogoutClick={() => setShowLogoutModal(true)}
+        />
 
         <main className="flex-1 min-w-0">
           <div className="bg-[#004220] text-white text-center py-5 rounded-2xl text-xl font-semibold shadow-sm">
@@ -320,23 +360,29 @@ export default function AdminResidentPage() {
           </div>
 
           {/* Filter bar + buttons */}
-          <div className="mt-6 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+          <div className="mt-6 flex items-center justify-between gap-4 max-sm:flex-col max-sm:items-stretch">
+            {/* KIRI: search + filter */}
+            <div className="flex items-center gap-3 max-sm:w-full max-sm:flex-col max-sm:items-stretch">
+              {/* Search */}
+              <div className="relative max-sm:w-full">
+                <FaSearch
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  size={14}
+                />
                 <input
                   type="text"
                   placeholder="Cari Resident"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 pr-3 py-2 border rounded-lg text-sm w-64"
+                  className="pl-9 pr-3 py-2 border rounded-lg text-sm w-64 max-sm:w-full"
                 />
               </div>
 
+              {/* Filter (mobile: turun ke bawah search) */}
               <select
                 value={selectedUsroh}
                 onChange={(e) => setSelectedUsroh(e.target.value)}
-                className="px-3 py-2 border rounded-lg text-sm"
+                className="px-3 py-2 border rounded-lg text-sm max-sm:w-full"
               >
                 <option value="all">Usroh (All)</option>
                 {usrohList.map((u) => (
@@ -347,17 +393,18 @@ export default function AdminResidentPage() {
               </select>
             </div>
 
-            <div className="flex items-center gap-3">
+            {/* KANAN: tombol-tombol */}
+            <div className="flex items-center gap-3 max-sm:w-full max-sm:justify-end">
               <button
                 onClick={() => setShowImportModal(true)}
-                className="bg-white border hover:bg-gray-50 text-gray-800 px-5 py-2 rounded-full shadow-sm transition font-semibold text-sm"
+                className="bg-white border hover:bg-gray-50 text-gray-800 px-5 py-2 rounded-full shadow-sm transition font-semibold text-sm max-sm:px-3 max-sm:text-xs"
               >
-                Import Excel
+                Import Resident
               </button>
 
               <button
                 onClick={openAddModal}
-                className="bg-[#16a34a] hover:bg-[#15803d] text-white px-5 py-2 rounded-full flex items-center shadow-sm transition font-semibold text-sm"
+                className="bg-[#16a34a] hover:bg-[#15803d] text-white px-5 py-2 rounded-full flex items-center shadow-sm transition font-semibold text-sm max-sm:px-3 max-sm:text-xs"
               >
                 <FaPlus className="mr-2" /> Add Resident
               </button>
@@ -367,11 +414,15 @@ export default function AdminResidentPage() {
           {/* Table */}
           <section className="mt-6 bg-white rounded-2xl shadow-sm border overflow-hidden">
             {loading && residents.length === 0 ? (
-              <div className="text-center py-10 text-gray-500">Memuat data...</div>
+              <div className="text-center py-10 text-gray-500">
+                Memuat data...
+              </div>
             ) : filteredResidents.length === 0 ? (
-              <div className="text-center py-10 text-gray-500">Tidak ada data resident</div>
+              <div className="text-center py-10 text-gray-500">
+                Tidak ada data resident
+              </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b">
                     <tr>
@@ -392,20 +443,30 @@ export default function AdminResidentPage() {
                         <td className="py-3 px-4">{r.usroh || "-"}</td>
 
                         <td className="py-3 px-4">
-                          <div className="flex items-center justify-center gap-4">
+                          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
                             <button
                               onClick={() => openDetailModal(r)}
                               className="hover:opacity-80"
                               title="Detail"
                             >
-                              <img src="/eye_icon.svg" alt="Detail" className="w-5 h-5" />
+                              <img
+                                src="/eye_icon.svg"
+                                alt="Detail"
+                                className="w-5 h-5 shrink-0"
+                              />
                             </button>
 
-                            <button onClick={() => openEditModal(r)} className="text-blue-600 hover:underline">
+                            <button
+                              onClick={() => openEditModal(r)}
+                              className="text-blue-600 hover:underline"
+                            >
                               Edit
                             </button>
 
-                            <button onClick={() => handleDelete(r)} className="text-red-600 hover:underline">
+                            <button
+                              onClick={() => handleDelete(r)}
+                              className="text-red-600 hover:underline"
+                            >
                               Hapus
                             </button>
                           </div>
@@ -419,7 +480,8 @@ export default function AdminResidentPage() {
           </section>
 
           <div className="mt-3 text-sm text-gray-600">
-            Menampilkan {filteredResidents.length} dari {residents.length} resident
+            Menampilkan {filteredResidents.length} dari {residents.length}{" "}
+            resident
           </div>
         </main>
       </div>
@@ -428,7 +490,9 @@ export default function AdminResidentPage() {
       {showImportModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <h2 className="text-lg font-semibold mb-2">Import Resident (Excel)</h2>
+            <h2 className="text-lg font-semibold mb-2">
+              Import Resident (Excel)
+            </h2>
             <p className="text-xs text-gray-500 mb-4">
               Kolom wajib: name, email, nim, jurusan, angkatan.
             </p>
@@ -489,7 +553,9 @@ export default function AdminResidentPage() {
 
               <div>
                 <div className="text-gray-500">Email</div>
-                <div className="font-medium">{detailResident.email || "-"}</div>
+                <div className="font-medium break-all">
+                  {detailResident.email || "-"}
+                </div>
               </div>
 
               <div>
@@ -499,17 +565,23 @@ export default function AdminResidentPage() {
 
               <div>
                 <div className="text-gray-500">Jurusan</div>
-                <div className="font-medium">{detailResident.jurusan || "-"}</div>
+                <div className="font-medium">
+                  {detailResident.jurusan || "-"}
+                </div>
               </div>
 
               <div>
                 <div className="text-gray-500">Angkatan</div>
-                <div className="font-medium">{detailResident.angkatan || "-"}</div>
+                <div className="font-medium">
+                  {detailResident.angkatan || "-"}
+                </div>
               </div>
 
               <div>
                 <div className="text-gray-500">No Telp</div>
-                <div className="font-medium">{detailResident.noTelp || "-"}</div>
+                <div className="font-medium">
+                  {detailResident.noTelp || "-"}
+                </div>
               </div>
 
               <div>
@@ -519,12 +591,16 @@ export default function AdminResidentPage() {
 
               <div>
                 <div className="text-gray-500">Lantai</div>
-                <div className="font-medium">{detailResident.lantai || "-"}</div>
+                <div className="font-medium">
+                  {detailResident.lantai || "-"}
+                </div>
               </div>
 
               <div className="col-span-2">
                 <div className="text-gray-500">Created At</div>
-                <div className="font-medium">{detailResident.createdAt || "-"}</div>
+                <div className="font-medium">
+                  {detailResident.createdAt || "-"}
+                </div>
               </div>
             </div>
 
@@ -554,7 +630,9 @@ export default function AdminResidentPage() {
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-semibold mb-4">{modalMode === "add" ? "Tambah Resident" : "Edit Resident"}</h2>
+            <h2 className="text-lg font-semibold mb-4">
+              {modalMode === "add" ? "Tambah Resident" : "Edit Resident"}
+            </h2>
 
             <div className="space-y-3">
               <div>
@@ -597,7 +675,10 @@ export default function AdminResidentPage() {
               {modalMode === "edit" ? (
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    Password <span className="text-xs text-gray-500">(kosongkan jika tidak diubah)</span>
+                    Password{" "}
+                    <span className="text-xs text-gray-500">
+                      (kosongkan jika tidak diubah)
+                    </span>
                   </label>
                   <input
                     type="password"
@@ -608,7 +689,8 @@ export default function AdminResidentPage() {
                 </div>
               ) : (
                 <div className="text-xs text-gray-500 border rounded-lg px-3 py-2 bg-gray-50">
-                  Password akan dibuat oleh resident saat aktivasi akun melalui email.
+                  Password akan dibuat oleh resident saat aktivasi akun melalui
+                  email.
                 </div>
               )}
 
@@ -637,7 +719,9 @@ export default function AdminResidentPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">No Telp</label>
+                <label className="block text-sm font-medium mb-1">
+                  No Telp
+                </label>
                 <input
                   type="text"
                   value={formNoTelp}
@@ -650,7 +734,9 @@ export default function AdminResidentPage() {
                 <label className="block text-sm font-medium mb-1">Usroh</label>
                 <select
                   value={formUsrohId || ""}
-                  onChange={(e) => setFormUsrohId(Number(e.target.value) || null)}
+                  onChange={(e) =>
+                    setFormUsrohId(Number(e.target.value) || null)
+                  }
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                 >
                   <option value="">Pilih Usroh</option>
@@ -664,10 +750,16 @@ export default function AdminResidentPage() {
             </div>
 
             <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => setShowModal(false)} className="px-4 py-2 border rounded-lg hover:bg-gray-50">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+              >
                 Batal
               </button>
-              <button onClick={handleSave} className="px-4 py-2 bg-[#004220] text-white rounded-lg hover:bg-[#003318]">
+              <button
+                onClick={handleSave}
+                className="px-4 py-2 bg-[#004220] text-white rounded-lg hover:bg-[#003318]"
+              >
                 Simpan
               </button>
             </div>

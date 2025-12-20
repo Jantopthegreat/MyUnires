@@ -1,14 +1,11 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
-import { FaSearch, FaPlus } from "react-icons/fa";
-import Sidebar from "@/components/Sidebar";
-import TahfidzHeader from "@/components/TahfidzHeader";
-import TahfidzFilterBar from "@/components/TahfidzFilterBar";
-import TahfidzTable, { NilaiTahfidzData } from "@/components/TahfidzTable";
-import TahfidzModal from "@/components/TahfidzModal";
-import LogoutModal from "@/components/LogoutModal";
+
+import { useEffect, useRef, useState } from "react";
 import Swal from "sweetalert2";
-import { clearAuth } from "@/lib/api";
+
+import Sidebar_Musyrif from "@/components/sidebar_musyrif";
+import TahfidzModal from "@/components/TahfidzModal";
+import { NilaiTahfidzData } from "@/components/TahfidzTable";
 
 interface Resident {
   id: number;
@@ -32,9 +29,11 @@ interface TargetHafalan {
 }
 
 export default function TahfidzPage() {
+  // Sidebar states (desktop + mobile)
   const [isOpen, setIsOpen] = useState(true);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const toggleSidebar = () => setIsOpen((prev) => !prev);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Data states
@@ -56,24 +55,26 @@ export default function TahfidzPage() {
     null
   );
 
-  // Fetch all data on mount
   useEffect(() => {
     fetchAllData();
   }, []);
 
-  // Handler untuk filter
   const handleFilter = (search: string, usroh: string) => {
     let result = [...nilaiList];
+
     if (search) {
+      const s = search.toLowerCase();
       result = result.filter(
         (item) =>
-          item.resident.toLowerCase().includes(search.toLowerCase()) ||
-          item.nim.toLowerCase().includes(search.toLowerCase())
+          item.resident.toLowerCase().includes(s) ||
+          item.nim.toLowerCase().includes(s)
       );
     }
+
     if (usroh !== "all") {
       result = result.filter((item) => item.usrohId === Number(usroh));
     }
+
     setFilteredData(result);
     setSearchTerm(search);
     setSelectedUsroh(usroh);
@@ -92,41 +93,31 @@ export default function TahfidzPage() {
         return;
       }
 
-      // Fetch nilai tahfidz detail (1 nilai = 1 baris)
-      const nilaiRes = await fetch(
-        "http://localhost:3001/api/musyrif/tahfidz/detail",
-        {
+      const [nilaiRes, residentsRes, usrohRes, targetRes] = await Promise.all([
+        fetch("http://localhost:3001/api/musyrif/tahfidz/detail", {
           headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      const nilaiData = await nilaiRes.json();
-
-      // Fetch residents
-      const residentsRes = await fetch(
-        "http://localhost:3001/api/musyrif/residents",
-        {
+        }),
+        fetch("http://localhost:3001/api/musyrif/residents", {
           headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      const residentsData = await residentsRes.json();
-
-      // Fetch usroh
-      const usrohRes = await fetch("http://localhost:3001/api/musyrif/usroh", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const usrohData = await usrohRes.json();
-
-      // Fetch target hafalan
-      const targetRes = await fetch(
-        "http://localhost:3001/api/musyrif/target-hafalan",
-        {
+        }),
+        fetch("http://localhost:3001/api/musyrif/usroh", {
           headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      const targetData = await targetRes.json();
+        }),
+        fetch("http://localhost:3001/api/musyrif/target-hafalan", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+
+      const [nilaiData, residentsData, usrohData, targetData] =
+        await Promise.all([
+          nilaiRes.json(),
+          residentsRes.json(),
+          usrohRes.json(),
+          targetRes.json(),
+        ]);
 
       setNilaiList(nilaiData.data || []);
-      setFilteredData(nilaiData.data || []); // langsung tampilkan semua data
+      setFilteredData(nilaiData.data || []);
       setResidents(residentsData.data || []);
       setUsrohList(usrohData.data || []);
       setTargetHafalan(targetData.data || []);
@@ -153,7 +144,7 @@ export default function TahfidzPage() {
     setShowModal(true);
   };
 
-  const handleSave = async (formData: any) => {
+  const handleSave = async (payload: any) => {
     try {
       const token = localStorage.getItem("token");
       if (!token) {
@@ -173,7 +164,7 @@ export default function TahfidzPage() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(payload),
         }
       );
 
@@ -189,7 +180,7 @@ export default function TahfidzPage() {
         });
 
         setShowModal(false);
-        fetchAllData(); // Refresh data
+        fetchAllData();
       } else {
         Swal.fire({
           icon: "error",
@@ -197,7 +188,7 @@ export default function TahfidzPage() {
           text: result.message || "Terjadi kesalahan saat menyimpan data.",
         });
       }
-    } catch (error) {
+    } catch {
       Swal.fire({
         icon: "error",
         title: "Error",
@@ -224,12 +215,12 @@ export default function TahfidzPage() {
             <p><strong>Email:</strong> ${nilai.email}</p>
             <p><strong>Usroh:</strong> ${nilai.usroh || "-"}</p>
           </div>
-          
+
           <div>
             <h3 class="font-bold text-lg mb-2">Nilai Tahfidz</h3>
             <p><strong>Target Hafalan:</strong> ${nilai.target}</p>
             <p><strong>Surah:</strong> ${nilai.surah}</p>
-            <p><strong>Status:</strong> 
+            <p><strong>Status:</strong>
               <span class="px-2 py-1 rounded text-xs font-semibold ml-2 ${
                 nilai.status === "SELESAI"
                   ? "bg-green-100 text-green-700"
@@ -240,7 +231,7 @@ export default function TahfidzPage() {
                 ${nilai.status}
               </span>
             </p>
-            <p><strong>Nilai Huruf:</strong> 
+            <p><strong>Nilai Huruf:</strong>
               <span class="px-2 py-1 rounded text-xs font-semibold ml-2 ${
                 nilai.nilaiHuruf === "A" || nilai.nilaiHuruf === "A-"
                   ? "bg-green-100 text-green-800"
@@ -262,16 +253,15 @@ export default function TahfidzPage() {
         </div>
       `,
       confirmButtonColor: "#004220",
-      width: "600px",
+      width: "min(600px, 92vw)",
     });
   };
 
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
+  const handleImportClick = () => fileInputRef.current?.click();
 
   const handleFileUpload = async (file: File) => {
     if (!file) return;
+
     if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
       Swal.fire({
         icon: "error",
@@ -280,6 +270,7 @@ export default function TahfidzPage() {
       });
       return;
     }
+
     try {
       const token = localStorage.getItem("token");
       if (!token) {
@@ -290,19 +281,21 @@ export default function TahfidzPage() {
         });
         return;
       }
-      const formData = new FormData();
-      formData.append("file", file);
+
+      const fd = new FormData();
+      fd.append("file", file);
+
       const response = await fetch(
         "http://localhost:3001/api/musyrif/tahfidz/import",
         {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
         }
       );
+
       const result = await response.json();
+
       if (response.ok) {
         Swal.fire({
           icon: "success",
@@ -318,6 +311,7 @@ export default function TahfidzPage() {
           `,
           confirmButtonColor: "#22c55e",
         });
+
         fetchAllData();
       } else {
         Swal.fire({
@@ -326,7 +320,7 @@ export default function TahfidzPage() {
           text: result.message || "Terjadi kesalahan saat import data.",
         });
       }
-    } catch (error) {
+    } catch {
       Swal.fire({
         icon: "error",
         title: "Error",
@@ -336,97 +330,226 @@ export default function TahfidzPage() {
   };
 
   return (
-    <div className="min-h-screen flex bg-white">
-      <TahfidzHeader onLogout={() => setShowLogoutModal(true)} />
-      <LogoutModal
-        open={showLogoutModal}
-        onCancel={() => setShowLogoutModal(false)}
-        onLogout={() => {
-          clearAuth();
-          window.location.href = "/login";
-        }}
+    <div className="min-h-screen bg-white">
+      {/* ===== TOP HEADER (NO LOGOUT) ===== */}
+      <header className="fixed top-0 left-0 right-0 bg-white z-30 h-16 flex items-center justify-between px-4 sm:px-6 border-b">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setMobileOpen(true)}
+            className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+            aria-label="Open menu"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M4 6h16M4 12h16M4 18h16"
+                stroke="#0D6B44"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+
+          <img
+            src="/lg_umy.svg"
+            alt="UMY"
+            className="h-7 sm:h-8 w-auto object-contain shrink-0"
+          />
+          <img
+            src="/lg_unires.svg"
+            alt="UNIRES"
+            className="h-7 sm:h-8 w-auto object-contain shrink-0"
+          />
+        </div>
+
+        <div className="w-10" />
+      </header>
+
+      {/* ===== SIDEBAR (logout di sidebar) ===== */}
+      <Sidebar_Musyrif
+        isOpen={isOpen}
+        toggleSidebar={toggleSidebar}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
       />
-      <Sidebar isOpen={isOpen} toggleSidebar={toggleSidebar} />
+
+      {/* ===== MAIN ===== */}
       <main
-        className={`flex-1 flex flex-col transition-all duration-300 ${
-          isOpen ? "ml-64" : "ml-12"
-        }`}
+        className={[
+          "pt-16 transition-all duration-300 ease-in-out",
+          isOpen ? "md:ml-64" : "md:ml-14",
+          "ml-0",
+        ].join(" ")}
       >
-        <div className="h-16" />
-        <header className="px-6 py-4">
-          <h1 className="bg-[#004220] text-white text-center py-6 rounded-md text-lg font-semibold">
-            Nilai Tahfidz
-          </h1>
-        </header>
-        <TahfidzFilterBar
-          searchTerm={searchTerm}
-          selectedUsroh={selectedUsroh}
-          usrohList={usrohList}
-          onFilter={handleFilter}
-          onImport={handleFileUpload}
-          onAdd={handleAdd}
-        />
-        <section className="px-6 pb-6">
-          <div className="bg-white rounded-lg shadow border border-[#004220] overflow-hidden">
-            {loading ? (
-              <div className="text-center py-10 text-gray-500">
-                Memuat data...
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-4 sm:py-6">
+          <header className="mb-4">
+            <h1 className="bg-[#004220] text-white text-center py-4 sm:py-6 rounded-2xl text-base sm:text-lg font-semibold shadow-sm">
+              Nilai Tahfidz
+            </h1>
+          </header>
+
+          {/* ===== FILTER CARD (rapi di mobile) ===== */}
+          <section className="mb-5">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  placeholder="Cari Resident"
+                  value={searchTerm}
+                  onChange={(e) => handleFilter(e.target.value, selectedUsroh)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-[#004220]"
+                />
+
+                <select
+                  value={selectedUsroh}
+                  onChange={(e) => handleFilter(searchTerm, e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#004220]"
+                >
+                  <option value="all">Usroh (All)</option>
+                  {usrohList.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.nama}
+                    </option>
+                  ))}
+                </select>
               </div>
-            ) : filteredData.length === 0 ? (
-              <div className="text-center py-10 text-gray-500">
-                Tidak ada data tahfidz
+
+              <div className="mt-3 flex flex-col sm:flex-row gap-3 sm:justify-end">
+                {/* hidden input excel */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleFileUpload(f);
+                    e.currentTarget.value = "";
+                  }}
+                />
+
+                <button
+                  type="button"
+                  onClick={handleImportClick}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 text-sm font-semibold hover:bg-gray-50 transition"
+                >
+                  Impor Data
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleAdd}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#004220] text-white text-sm font-semibold hover:bg-[#005a2c] transition"
+                >
+                  Tambah Nilai
+                </button>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <div className="max-h-[600px] overflow-y-auto">
-                  <table className="w-full text-sm border-collapse">
-                    <thead className="text-[#004220] border-b border-[#004220] bg-white sticky top-0 z-10">
-                      <tr>
-                        <th className="py-3 text-left px-4 bg-white">No</th>
-                        <th className="py-3 text-left px-4 bg-white">Nama</th>
-                        <th className="py-3 text-left px-4 bg-white">NIM</th>
-                        <th className="py-3 text-left px-4 bg-white">Usroh</th>
-                        <th className="py-3 text-left px-4 bg-white">Target Hafalan</th>
-                        <th className="py-3 text-left px-4 bg-white">Surah</th>
-                        <th className="py-3 text-left px-4 bg-white">Nilai Huruf</th>
-                        <th className="py-3 text-center px-4 bg-white">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredData.map((nilai, i) => (
-                        <tr
-                          key={nilai.id}
-                          className="text-[#004220] border-b border-[#004220] hover:bg-[#F7F9F8] transition"
-                        >
-                          <td className="py-3 px-4">{i + 1}</td>
-                          <td className="py-3 px-4">{nilai.resident}</td>
-                          <td className="py-3 px-4">{nilai.nim}</td>
-                          <td className="py-3 px-4">{nilai.usroh || "-"}</td>
-                          <td className="py-3 px-4">{nilai.target || "-"}</td>
-                          <td className="py-3 px-4">{nilai.surah || "-"}</td>
-                          <td className="py-3 px-4">{nilai.nilaiHuruf || "-"}</td>
-                          <td className="py-3 px-4 text-center">
-                            <button
-                              onClick={() => handleViewDetail(nilai)}
-                              className="flex items-center gap-2 bg-[#004220] text-white px-4 py-2 rounded-lg hover:bg-[#005a2c] transition text-xs font-semibold"
-                            >
-                              Lihat Detail
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+            </div>
+          </section>
+
+          {/* ===== TABLE ===== */}
+          <section className="pb-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-[#004220]/20 overflow-hidden">
+              {loading ? (
+                <div className="text-center py-10 text-gray-500 text-sm">
+                  Memuat data...
                 </div>
-              </div>
-            )}
+              ) : filteredData.length === 0 ? (
+                <div className="text-center py-10 text-gray-500 text-sm">
+                  Tidak ada data tahfidz
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <div className="max-h-[65vh] md:max-h-[600px] overflow-y-auto">
+                    <table className="w-full text-sm border-collapse">
+                      <thead className="text-[#004220] border-b border-[#004220]/30 bg-white sticky top-0 z-10">
+                        <tr>
+                          <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                            No
+                          </th>
+                          <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                            Nama
+                          </th>
+                          <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                            NIM
+                          </th>
+                          <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                            Usroh
+                          </th>
+                          <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                            Target Hafalan
+                          </th>
+                          <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                            Surah
+                          </th>
+                          <th className="py-3 text-left px-4 bg-white whitespace-nowrap">
+                            Nilai Huruf
+                          </th>
+                          <th className="py-3 text-center px-4 bg-white whitespace-nowrap">
+                            Aksi
+                          </th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {filteredData.map((nilai, i) => (
+                          <tr
+                            key={nilai.id}
+                            className="text-[#004220] border-b border-[#004220]/10 hover:bg-[#F7F9F8] transition"
+                          >
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              {i + 1}
+                            </td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              {nilai.resident}
+                            </td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              {nilai.nim}
+                            </td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              {nilai.usroh || "-"}
+                            </td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              {nilai.target || "-"}
+                            </td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              {nilai.surah || "-"}
+                            </td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              {nilai.nilaiHuruf || "-"}
+                            </td>
+                            <td className="py-3 px-4 text-center whitespace-nowrap">
+                              <div className="flex justify-center">
+                                <button
+                                  onClick={() => handleViewDetail(nilai)}
+                                  className="bg-[#004220] text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-[#005a2c] transition text-xs font-semibold"
+                                >
+                                  Lihat Detail
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-3 text-sm text-gray-600">
+              Menampilkan {filteredData.length} dari {nilaiList.length} data
+              tahfidz
+            </div>
+          </section>
+
+          <div className="text-xs text-gray-500">
+            © 2025 Universitas Muhammadiyah Yogyakarta - Asrama Unires
           </div>
-          {/* Info jumlah data */}
-          <div className="mt-3 text-sm text-gray-600">
-            Menampilkan {filteredData.length} dari {nilaiList.length} data tahfidz
-          </div>
-        </section>
+        </div>
       </main>
+
+      {/* ===== MODAL ADD/EDIT ===== */}
       <TahfidzModal
         isOpen={showModal}
         onClose={() => setShowModal(false)}

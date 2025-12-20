@@ -4,14 +4,15 @@ import {
   FiMenu,
   FiX,
   FiHome,
+  FiUsers,
+  FiEdit3,
   FiBarChart2,
   FiBookOpen,
-  FiEdit3,
-  FiAward,
   FiLogOut,
 } from "react-icons/fi";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { apiGet, clearAuth } from "@/lib/api";
 
 type Props = {
   isOpen: boolean; // desktop: expanded vs mini
@@ -20,16 +21,18 @@ type Props = {
   setMobileOpen: (v: boolean) => void;
 };
 
-interface UserData {
+type UserData = {
   id: number;
   name: string;
   email: string;
   nim?: string;
   jurusan?: string;
   angkatan?: number;
-}
+};
 
-export default function Sidebar_Resident({
+type ApiRes<T> = { success: boolean; message?: string; data: T };
+
+export default function Sidebar_AsistenMusyrif({
   isOpen,
   toggleSidebar,
   mobileOpen,
@@ -41,35 +44,31 @@ export default function Sidebar_Resident({
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch user profile
+  // Fetch profile (sesuaikan endpoint kalau beda)
   useEffect(() => {
-    const fetchUserData = async () => {
+    let active = true;
+
+    (async () => {
       try {
-        const token = localStorage.getItem("token");
-        if (!token) return;
-
-        const response = await fetch(
-          "http://localhost:3001/api/resident/profile",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-
-        const data = await response.json();
-        if (data?.success) setUserData(data.data);
-      } catch (error) {
-        console.error("Error fetching user data:", error);
+        // contoh endpoint profile asisten (ubah sesuai backend kamu)
+        const res = await apiGet<ApiRes<UserData>>("/api/asisten/profile");
+        if (!active) return;
+        if (res?.success) setUserData(res.data);
+      } catch (e) {
+        // kalau endpoint belum ada, biarin aja kosong (gak bikin crash)
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
-    };
+    })();
 
-    fetchUserData();
+    return () => {
+      active = false;
+    };
   }, []);
 
   const initial = useMemo(() => {
     const name = userData?.name || "";
-    return name ? name.charAt(0).toUpperCase() : "?";
+    return name ? name.charAt(0).toUpperCase() : "A";
   }, [userData]);
 
   const menuItems = useMemo(
@@ -77,32 +76,32 @@ export default function Sidebar_Resident({
       {
         title: "Dashboard",
         icon: <FiHome size={18} />,
-        href: "/resident/dashboard",
+        href: "/dashboard/asisten-musyrif",
       },
       {
-        title: "Nilai Tahfidz",
-        icon: <FiAward size={18} />,
-        href: "/resident/nilaiTahfidz",
+        title: "Resident Per Usroh",
+        icon: <FiUsers size={18} />,
+        href: "/dashboard/asisten-musyrif/resident-per-usroh",
       },
       {
-        title: "Progres Hafalan",
-        icon: <FiBarChart2 size={18} />,
-        href: "/resident/progresHafalan",
-      },
-      {
-        title: "Materi Pembelajaran",
-        icon: <FiBookOpen size={18} />,
-        href: "/resident/MateriPembelajaran",
-      },
-      {
-        title: "Kerjakan Assignment",
+        title: "Input Nilai Tahfidz",
         icon: <FiEdit3 size={18} />,
-        href: "/resident/kerjakanAssignment",
+        href: "/dashboard/asisten-musyrif/input-nilai-tahfidz",
       },
       {
-        title: "Leaderboard",
-        icon: <FiAward size={18} />,
-        href: "/resident/leaderboard",
+        title: "Progress Hafalan",
+        icon: <FiBarChart2 size={18} />,
+        href: "/dashboard/asisten-musyrif/progres-hafalan",
+      },
+      {
+        title: "Materi (Read-only)",
+        icon: <FiBookOpen size={18} />,
+        href: "/dashboard/asisten-musyrif/materi",
+      },
+      {
+        title: "Buat Assignment",
+        icon: <FiEdit3 size={18} />,
+        href: "/dashboard/asisten-musyrif/buat-assignment",
       },
     ],
     []
@@ -114,7 +113,7 @@ export default function Sidebar_Resident({
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
+    clearAuth();
     setMobileOpen(false);
     window.location.href = "/login";
   };
@@ -149,7 +148,7 @@ export default function Sidebar_Resident({
             ) : (
               <>
                 <p className="font-semibold text-sm text-[#004220] truncate">
-                  {userData?.name || "Resident"}
+                  {userData?.name || "Asisten Musyrif"}
                 </p>
                 <p className="text-xs text-[#004220]/80 truncate">
                   {userData?.email || ""}
@@ -166,7 +165,11 @@ export default function Sidebar_Resident({
     <nav className="mt-3">
       <ul className="space-y-1">
         {menuItems.map((item) => {
-          const active = pathname === item.href;
+          const active =
+            pathname === item.href ||
+            (item.href !== "/dashboard/asisten-musyrif" &&
+              pathname?.startsWith(item.href));
+
           return (
             <li key={item.href}>
               <button
@@ -209,8 +212,6 @@ export default function Sidebar_Resident({
           <FiLogOut size={18} />
           {!compact && <span className="text-sm font-semibold">Logout</span>}
         </button>
-
-        {/* strip hijau bawah (biar konsisten branding) */}
       </div>
     </div>
   );
@@ -224,7 +225,6 @@ export default function Sidebar_Resident({
           mobileOpen ? "pointer-events-auto" : "pointer-events-none",
         ].join(" ")}
       >
-        {/* backdrop */}
         <div
           onClick={() => setMobileOpen(false)}
           className={[
@@ -233,7 +233,6 @@ export default function Sidebar_Resident({
           ].join(" ")}
         />
 
-        {/* panel */}
         <aside
           className={[
             "absolute left-0 top-16 bottom-0 w-[280px] bg-white border-r shadow-xl",
@@ -244,7 +243,7 @@ export default function Sidebar_Resident({
           <div className="px-4 pt-4">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-[#004220]">
-                Menu Resident
+                Menu Asisten
               </p>
               <button
                 onClick={() => setMobileOpen(false)}
@@ -265,7 +264,7 @@ export default function Sidebar_Resident({
         </aside>
       </div>
 
-      {/* ===== DESKTOP SIDEBAR (fixed) ===== */}
+      {/* ===== DESKTOP SIDEBAR ===== */}
       <aside
         className={[
           "hidden md:flex fixed top-16 left-0 bottom-0 z-20",
@@ -273,7 +272,6 @@ export default function Sidebar_Resident({
           isOpen ? "w-64" : "w-14",
         ].join(" ")}
       >
-        {/* toggle desktop collapse */}
         <div
           className={[
             "h-12 flex items-center",
