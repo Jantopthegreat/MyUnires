@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Sidebar_Musyrif from "@/components/sidebar_musyrif";
+import LogoutModal from "@/components/LogoutModal";
 import { apiGet } from "@/lib/api";
 
 type ResidentItem = {
@@ -51,10 +52,18 @@ function StatCard({
 export default function DashboardMusyrifPage() {
   const [isOpen, setIsOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const [residents, setResidents] = useState<ResidentItem[]>([]);
   const [nilaiDetail, setNilaiDetail] = useState<NilaiTahfidzDetailRow[]>([]);
   const [loading, setLoading] = useState(true);
+  // Fungsi handleLogout
+  const handleLogout = () => {    
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("token");     
+    }
+    window.location.href = "/login";
+  };
 
   useEffect(() => {
     let active = true;
@@ -141,7 +150,13 @@ export default function DashboardMusyrifPage() {
           />
         </div>
 
-        <div className="w-10" />
+        {/* Tombol Logout */}
+        <button
+          className="bg-[#E50914] hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-full shadow-md"
+          onClick={() => setShowLogoutModal(true)}
+        >
+          Log Out
+        </button>
       </header>
 
       <Sidebar_Musyrif
@@ -239,6 +254,12 @@ export default function DashboardMusyrifPage() {
           </div>
         </div>
       </main>
+      {/* Modal Logout */}
+      <LogoutModal
+        open={showLogoutModal}
+        onCancel={() => setShowLogoutModal(false)}
+        onLogout={handleLogout}
+      />
     </div>
   );
 }
