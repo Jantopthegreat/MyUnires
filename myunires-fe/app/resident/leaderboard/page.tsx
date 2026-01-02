@@ -71,10 +71,12 @@ export default function LeaderboardPage() {
   const filteredData = useMemo(() => {
     let filtered = [...leaderboardData];
 
-    // sort by selected metric (only if not all)
+    // filter by selected metric
     if (filterType === "hafalan") {
+      filtered = filtered.filter((item) => item.hafalanSelesai > 0);
       filtered.sort((a, b) => b.hafalanSelesai - a.hafalanSelesai);
     } else if (filterType === "assignment") {
+      filtered = filtered.filter((item) => item.assignmentBenar > 0);
       filtered.sort((a, b) => b.assignmentBenar - a.assignmentBenar);
     } else {
       // default: rank ascending
