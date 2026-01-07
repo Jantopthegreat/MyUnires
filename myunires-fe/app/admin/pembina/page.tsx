@@ -74,7 +74,6 @@ export default function AdminMusyrifPage() {
   // form
   const [formName, setFormName] = useState("");
   const [formEmail, setFormEmail] = useState("");
-  const [formPassword, setFormPassword] = useState("");
   const [formLantaiId, setFormLantaiId] = useState<number | null>(null);
 
   const didFetch = useRef(false);
@@ -146,14 +145,46 @@ export default function AdminMusyrifPage() {
       const fd = new FormData();
       fd.append("file", importFile);
 
-      await apiUpload("/api/admin/musyrif/import", fd);
+      const res = await apiUpload<any>("/api/admin/musyrif/import", fd);
+
+      const created = res?.created ?? res?.data?.created ?? [];
+      const emailFailed = res?.emailFailed ?? res?.data?.emailFailed ?? [];
+      const skipped = res?.skipped ?? res?.data?.skipped ?? [];
 
       Swal.fire({
         icon: "success",
-        title: "Berhasil",
-        text: "Import berhasil",
-        timer: 2000,
+        title: "Import selesai",
+        html: `
+        <div style="text-align:left;font-size:13px">
+          <div><b>Created:</b> ${created.length}</div>
+          <div><b>Email failed:</b> ${emailFailed.length}</div>
+          <div><b>Skipped:</b> ${skipped.length}</div>
+          <hr/>
+          ${
+            emailFailed.length
+              ? `<div><b>Email gagal:</b><br/>${emailFailed
+                  .slice(0, 10)
+                  .map((x: any) => `- ${x.email}`)
+                  .join("<br/>")}</div>`
+              : ""
+          }
+          ${
+            skipped.length
+              ? `<div style="margin-top:8px"><b>Skipped:</b><br/>${skipped
+                  .slice(0, 10)
+                  .map((x: any) => `- row ${x.row}: ${x.reason}`)
+                  .join("<br/>")}</div>`
+              : ""
+          }
+          ${
+            emailFailed.length > 10 || skipped.length > 10
+              ? `<div style="margin-top:8px;color:#666">Menampilkan maksimal 10 item.</div>`
+              : ""
+          }
+        </div>
+      `,
       });
+
       setShowImportModal(false);
       setImportFile(null);
       fetchData();
@@ -179,7 +210,6 @@ export default function AdminMusyrifPage() {
     setSelectedMusyrif(null);
     setFormName("");
     setFormEmail("");
-    setFormPassword("");
     setFormLantaiId(null);
     setShowModal(true);
   };
@@ -189,9 +219,7 @@ export default function AdminMusyrifPage() {
     setSelectedMusyrif(m);
     setFormName(m.name || "");
     setFormEmail(m.email || "");
-    setFormPassword("");
 
-    // cari lantaiId dari nama lantai
     const match = lantaiList.find((l) => l.nama === m.lantai);
     setFormLantaiId(match?.id ?? null);
 
@@ -207,14 +235,6 @@ export default function AdminMusyrifPage() {
       });
       return;
     }
-    if (modalMode === "add" && !formPassword) {
-      Swal.fire({
-        icon: "error",
-        title: "Validasi",
-        text: "Password wajib diisi saat tambah musyrif.",
-      });
-      return;
-    }
 
     const payload: any = {
       name: formName,
@@ -222,17 +242,14 @@ export default function AdminMusyrifPage() {
       lantaiId: formLantaiId || null,
     };
 
-    if (modalMode === "add") payload.password = formPassword;
-    if (modalMode === "edit" && formPassword) payload.password = formPassword;
-
     try {
       if (modalMode === "add") {
         await apiPost("/api/admin/musyrif", payload);
         Swal.fire({
           icon: "success",
           title: "Berhasil!",
-          text: "Musyrif ditambahkan.",
-          timer: 1800,
+          text: "Musyrif dibuat. Link aktivasi dikirim ke email.",
+          timer: 2000,
         });
       } else if (selectedMusyrif) {
         await apiPut(`/api/admin/musyrif/${selectedMusyrif.id}`, payload);
@@ -250,7 +267,8 @@ export default function AdminMusyrifPage() {
       Swal.fire({
         icon: "error",
         title: "Gagal",
-        text: err?.message || "Terjadi kesalahan.",
+        text:
+          err?.response?.data?.message || err?.message || "Terjadi kesalahan.",
       });
     }
   };
@@ -602,27 +620,6 @@ export default function AdminMusyrifPage() {
                   type="email"
                   value={formEmail}
                   onChange={(e) => setFormEmail(e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Password{" "}
-                  {modalMode === "add" && (
-                    <span className="text-red-500">*</span>
-                  )}
-                  {modalMode === "edit" && (
-                    <span className="text-xs text-gray-500">
-                      {" "}
-                      (kosongkan jika tidak diubah)
-                    </span>
-                  )}
-                </label>
-                <input
-                  type="password"
-                  value={formPassword}
-                  onChange={(e) => setFormPassword(e.target.value)}
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                 />
               </div>

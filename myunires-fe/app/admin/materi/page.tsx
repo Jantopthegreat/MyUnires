@@ -54,6 +54,16 @@ export default function AdminMateriPage() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailMateri, setDetailMateri] = useState<Materi | null>(null);
 
+  const kategoriOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    materi.forEach((m) => {
+      const id = m.kategori?.id ?? m.kategoriId;
+      const nama = m.kategori?.nama;
+      if (id && nama) map.set(id, nama);
+    });
+    return Array.from(map.entries()).map(([id, nama]) => ({ id, nama }));
+  }, [materi]);
+
   const openDetailModal = (m: Materi) => {
     setDetailMateri(m);
     setShowDetailModal(true);
@@ -362,15 +372,9 @@ export default function AdminMateriPage() {
                 value={selectedKategoriId}
                 onChange={(e) => setSelectedKategoriId(e.target.value)}
                 className="px-3 py-2 border rounded-lg text-sm max-sm:w-full"
-                disabled={kategori.length === 0}
-                title={
-                  kategori.length === 0
-                    ? "Endpoint kategori belum tersedia"
-                    : ""
-                }
               >
                 <option value="all">Kategori (All)</option>
-                {kategori.map((k) => (
+                {kategoriOptions.map((k) => (
                   <option key={k.id} value={String(k.id)}>
                     {k.nama}
                   </option>

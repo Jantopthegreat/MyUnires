@@ -47,6 +47,7 @@ import {
   deleteSubTarget,
   getAdminSummary,
   getTahfidzProgressByTarget,
+  getAllKategoriMateri,
 
 
 } from "../controllers/adminController.js";
@@ -60,6 +61,8 @@ const upload = multer({ dest: "uploads/" });
 
 router.get("/summary", verifyToken, isAdmin, getAdminSummary);
 router.get("/tahfidz/progress-target", verifyToken, isAdmin, getTahfidzProgressByTarget);
+router.get("/kategori-materi", verifyToken, isAdmin, getAllKategoriMateri);
+
 
 
 

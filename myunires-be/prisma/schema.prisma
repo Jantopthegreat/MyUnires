@@ -8,215 +8,227 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  name      String
-  email     String   @unique
+  id    Int    @id @default(autoincrement())
+  name  String
+  email String @unique
 
   // ubah jadi nullable supaya admin bisa buat akun tanpa password
-  password  String?  
+  password String?
 
-  role      Role
-  isActive  Boolean  @default(false) // aktif setelah set password via email
+  role     Role
+  isActive Boolean @default(false) // aktif setelah set password via email
 
   createdAt DateTime @default(now())
 
-  resident  Resident?
-  musyrif   Musyrif?
-  asisten   AsistenMusyrif?
+  resident Resident?
+  musyrif  Musyrif?
+  asisten  AsistenMusyrif?
 
-  activationTokens AccountActivationToken[]
+  activationTokens    AccountActivationToken[]
+  passwordResetTokens PasswordResetToken[]
 }
 
 model AccountActivationToken {
-  id        Int      @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   userId    Int
-  tokenHash String   @unique
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
 
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
-
 
 model Resident {
-  id         Int       @id @default(autoincrement())
-  userId     Int       @unique
-  usrohId    Int?
-  lantaiId   Int?
-  nim        String
-  jurusan    String
-  angkatan   Int
-  noTelp     String?
-  createdAt  DateTime  @default(now())
-
-  // Relasi
-  user       User      @relation(fields: [userId], references: [id])
-  usroh      Usroh?    @relation(fields: [usrohId], references: [id])
-  lantai     Lantai?   @relation(fields: [lantaiId], references: [id])
-
-  nilai      Nilai[]
-  nilaiTahfidz NilaiTahfidz[]
-  jawaban    Jawaban[]
-}
-
-
-model Musyrif {
-  id        Int       @id @default(autoincrement())
-  userId    Int       @unique
-  lantaiId  Int?
-  createdAt DateTime  @default(now())
-
-  user      User      @relation(fields: [userId], references: [id])
-  lantai    Lantai?   @relation(fields: [lantaiId], references: [id])
-}
-
-model AsistenMusyrif {
-  id        Int       @id @default(autoincrement())
-  userId    Int       @unique
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
   usrohId   Int?
-  nim       String
+  lantaiId  Int?
+  nim       String   @unique
   jurusan   String
   angkatan  Int
   noTelp    String?
-  createdAt DateTime  @default(now())
+  createdAt DateTime @default(now())
 
-  user      User      @relation(fields: [userId], references: [id])
-  usroh     Usroh?    @relation(fields: [usrohId], references: [id])
+  // Relasi
+  user   User    @relation(fields: [userId], references: [id])
+  usroh  Usroh?  @relation(fields: [usrohId], references: [id])
+  lantai Lantai? @relation(fields: [lantaiId], references: [id])
+
+  nilai        Nilai[]
+  nilaiTahfidz NilaiTahfidz[]
+  jawaban      Jawaban[]
+
+  @@index([usrohId])
+  @@index([lantaiId])
 }
 
+model Musyrif {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  lantaiId  Int?
+  createdAt DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id])
+  lantai Lantai? @relation(fields: [lantaiId], references: [id])
+}
+
+model AsistenMusyrif {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  usrohId   Int?
+  nim       String   @unique
+  jurusan   String
+  angkatan  Int
+  noTelp    String?
+  createdAt DateTime @default(now())
+
+  user  User   @relation(fields: [userId], references: [id])
+  usroh Usroh? @relation(fields: [usrohId], references: [id])
+
+  @@index([usrohId])
+}
 
 model Gedung {
-  id       Int       @id @default(autoincrement())
-  nama     String
-  lantai   Lantai[]
+  id        Int      @id @default(autoincrement())
+  nama      String
+  lantai    Lantai[]
   createdAt DateTime @default(now())
 }
 
 model Lantai {
-  id        Int       @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   nama      String
   gedungId  Int
-  createdAt DateTime  @default(now())
+  createdAt DateTime @default(now())
 
-  gedung    Gedung    @relation(fields: [gedungId], references: [id])
+  gedung    Gedung     @relation(fields: [gedungId], references: [id])
   residents Resident[]
   musyrif   Musyrif[]
   usroh     Usroh[]
 }
 
 model Usroh {
-  id        Int       @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   nama      String
   lantaiId  Int?
-  createdAt DateTime  @default(now())
+  createdAt DateTime @default(now())
 
-  lantai    Lantai?   @relation(fields: [lantaiId], references: [id])
+  lantai    Lantai?          @relation(fields: [lantaiId], references: [id])
   asisten   AsistenMusyrif[]
   residents Resident[]
 }
 
 model Materi {
-  id          Int       @id @default(autoincrement())
-  judul       String
-  deskripsi   String?
-  fileUrl     String?
-  kategoriId  Int
-  createdAt   DateTime  @default(now())
+  id         Int      @id @default(autoincrement())
+  judul      String
+  deskripsi  String?
+  fileUrl    String?
+  kategoriId Int
+  createdAt  DateTime @default(now())
 
   kategori    KategoriMateri @relation(fields: [kategoriId], references: [id])
-  assignments Assignment[]  // Relasi: Materi punya banyak Assignment (soal)
+  assignments Assignment[] // Relasi: Materi punya banyak Assignment (soal)
 }
 
-
 model Assignment {
-  id          Int       @id @default(autoincrement())
-  materiId    Int       // Foreign key ke Materi
-  judul       String
-  pertanyaan  String
-  opsiA       String
-  opsiB       String
-  opsiC       String
-  opsiD       String
+  id           Int      @id @default(autoincrement())
+  materiId     Int // Foreign key ke Materi
+  judul        String
+  pertanyaan   String
+  opsiA        String
+  opsiB        String
+  opsiC        String
+  opsiD        String
   jawabanBenar String
-  soalImageUrl String?   // URL gambar soal (opsional)
-  createdAt   DateTime  @default(now())
+  soalImageUrl String? // URL gambar soal (opsional)
+  createdAt    DateTime @default(now())
 
-  materi      Materi    @relation(fields: [materiId], references: [id], onDelete: Cascade)
-  jawaban     Jawaban[]
+  materi  Materi    @relation(fields: [materiId], references: [id], onDelete: Cascade)
+  jawaban Jawaban[]
 }
 
 model Jawaban {
-  id            Int       @id @default(autoincrement())
-  residentId    Int
-  assignmentId  Int
-  jawabanUser   String
-  isCorrect     Boolean
-  createdAt     DateTime  @default(now())
+  id           Int      @id @default(autoincrement())
+  residentId   Int
+  assignmentId Int
+  jawabanUser  String
+  isCorrect    Boolean
+  createdAt    DateTime @default(now())
 
-  resident      Resident   @relation(fields: [residentId], references: [id])
-  assignment    Assignment @relation(fields: [assignmentId], references: [id])
+  resident   Resident   @relation(fields: [residentId], references: [id])
+  assignment Assignment @relation(fields: [assignmentId], references: [id])
 }
 
 model Nilai {
-  id          Int       @id @default(autoincrement())
-  residentId  Int
-  totalBenar  Int
-  totalSalah  Int
-  nilaiAkhir  Float
-  createdAt   DateTime  @default(now())
+  id         Int      @id @default(autoincrement())
+  residentId Int
+  totalBenar Int
+  totalSalah Int
+  nilaiAkhir Float
+  createdAt  DateTime @default(now())
 
-  resident    Resident  @relation(fields: [residentId], references: [id])
+  resident Resident @relation(fields: [residentId], references: [id])
 }
 
 model KategoriMateri {
-  id        Int       @id @default(autoincrement())
-  nama      String    @unique
-  createdAt DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  nama      String   @unique
+  createdAt DateTime @default(now())
 
-  materi    Materi[]  // Relasi ke tabel Materi
+  materi Materi[] // Relasi ke tabel Materi
 }
 
-
 model TargetHafalan {
-  id         Int      @id @default(autoincrement())
-  nama       String   // misalnya "Target 1"
-  surah      String   // "An-Naba’"
-  ayatMulai  Int
-  ayatAkhir  Int
-  createdAt  DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  nama      String // misalnya "Target 1"
+  surah     String // "An-Naba’"
+  ayatMulai Int
+  ayatAkhir Int
+  createdAt DateTime @default(now())
 
-  subTargets  SubTargets[]
+  subTargets   SubTargets[]
   nilaiTahfidz NilaiTahfidz[]
 }
 
 model SubTargets {
-  id             Int      @id @default(autoincrement())
-  nama           String   // contoh: "Sub Target 1"
-  targetId       Int
-  createdAt      DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  nama      String // contoh: "Sub Target 1"
+  targetId  Int
+  createdAt DateTime @default(now())
 
-  targetHafalan         TargetHafalan @relation(fields: [targetId], references: [id])
+  targetHafalan TargetHafalan @relation(fields: [targetId], references: [id])
 }
 
 model NilaiTahfidz {
   id              Int      @id @default(autoincrement())
-  soalImageUrl     String?
-  residentId       Int
-  targetHafalanId  Int
-  status           String
-  nilaiHuruf       String?
-  createdAt        DateTime @default(now())
+  soalImageUrl    String?
+  residentId      Int
+  targetHafalanId Int
+  status          String
+  nilaiHuruf      String?
+  createdAt       DateTime @default(now())
 
-  resident      Resident     @relation(fields: [residentId], references: [id])
+  resident      Resident      @relation(fields: [residentId], references: [id])
   targetHafalan TargetHafalan @relation(fields: [targetHafalanId], references: [id])
 
   @@unique([residentId, targetHafalanId])
 }
 
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
 
+  createdAt DateTime @default(now())
 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
 
 enum Role {
   ADMIN

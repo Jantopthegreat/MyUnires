@@ -76,7 +76,9 @@ export default function AdminAsistenPage() {
   const [formName, setFormName] = useState("");
   const [formNim, setFormNim] = useState("");
   const [formEmail, setFormEmail] = useState("");
-  const [formPassword, setFormPassword] = useState("");
+  const [formJurusan, setFormJurusan] = useState("");
+  const [formAngkatan, setFormAngkatan] = useState("");
+  const [formNoTelp, setFormNoTelp] = useState("");
   const [formUsrohId, setFormUsrohId] = useState<number | null>(null);
 
   const didFetch = useRef(false);
@@ -141,23 +143,18 @@ export default function AdminAsistenPage() {
     setFormName("");
     setFormNim("");
     setFormEmail("");
-    setFormPassword("");
+    setFormJurusan("");
+    setFormAngkatan("");
+    setFormNoTelp("");
     setFormUsrohId(null);
     setShowModal(true);
   };
 
   const openEditModal = async (a: AsistenListItem) => {
-    // Catatan: getAllAsistenMusyrif di backend kamu tidak mengirim nim,
-    // jadi nim tidak bisa di-prefill dari list. [file:41]
-    // Solusi ideal: pakai endpoint detail by id (getAsistenMusyrifById) lalu set nim,
-    // tapi controller detail kamu juga tidak select nim (di snippet). [file:41]
-    // Jadi di sini nim dikosongkan dan wajib diisi ulang saat edit (atau ubah backend agar kirim nim).
-
     setModalMode("edit");
     setSelectedAsisten(a);
     setFormName(a.name || "");
     setFormEmail(a.email || "");
-    setFormPassword("");
     setFormNim("");
 
     const match = usrohList.find((u) => u.nama === a.usroh);
@@ -178,20 +175,49 @@ export default function AdminAsistenPage() {
       }
 
       setImportLoading(true);
-
       const fd = new FormData();
       fd.append("file", importFile);
 
-      // Sesuaikan endpoint ini dengan backend kamu
-      // contoh pola: /api/admin/asisten/import
-      await apiUpload("/api/admin/asisten/import", fd);
+      const res = await apiUpload<any>("/api/admin/asisten/import", fd);
+
+      const created = res?.created ?? res?.data?.created ?? [];
+      const emailFailed = res?.emailFailed ?? res?.data?.emailFailed ?? [];
+      const skipped = res?.skipped ?? res?.data?.skipped ?? [];
 
       Swal.fire({
         icon: "success",
-        title: "Berhasil",
-        text: "Import berhasil",
-        timer: 2000,
+        title: "Import selesai",
+        html: `
+        <div style="text-align:left;font-size:13px">
+          <div><b>Created:</b> ${created.length}</div>
+          <div><b>Email failed:</b> ${emailFailed.length}</div>
+          <div><b>Skipped:</b> ${skipped.length}</div>
+          <hr/>
+          ${
+            emailFailed.length
+              ? `<div><b>Email gagal:</b><br/>${emailFailed
+                  .slice(0, 10)
+                  .map((x: any) => `- ${x.email}`)
+                  .join("<br/>")}</div>`
+              : ""
+          }
+          ${
+            skipped.length
+              ? `<div style="margin-top:8px"><b>Skipped:</b><br/>${skipped
+                  .slice(0, 10)
+                  .map((x: any) => `- row ${x.row}: ${x.reason}`)
+                  .join("<br/>")}</div>`
+              : ""
+          }
+          ${
+            emailFailed.length > 10 || skipped.length > 10
+              ? `<div style="margin-top:8px;color:#666">Menampilkan maksimal 10 item.</div>`
+              : ""
+          }
+        </div>
+      `,
       });
+
       setShowImportModal(false);
       setImportFile(null);
       fetchData();
@@ -208,20 +234,11 @@ export default function AdminAsistenPage() {
   };
 
   const handleSave = async () => {
-    if (!formName || !formEmail || !formNim) {
+    if (!formName || !formEmail || !formNim || !formJurusan || !formAngkatan) {
       Swal.fire({
         icon: "error",
         title: "Validasi",
-        text: "Nama, NIM, dan Email wajib diisi.",
-      });
-      return;
-    }
-
-    if (modalMode === "add" && !formPassword) {
-      Swal.fire({
-        icon: "error",
-        title: "Validasi",
-        text: "Password wajib diisi saat tambah asisten.",
+        text: "Nama, NIM, Email, Jurusan, dan Angkatan wajib diisi.",
       });
       return;
     }
@@ -230,11 +247,11 @@ export default function AdminAsistenPage() {
       name: formName,
       nim: formNim,
       email: formEmail,
+      jurusan: formJurusan,
+      angkatan: Number(formAngkatan),
+      noTelp: formNoTelp ? formNoTelp : null,
       usrohId: formUsrohId || null,
     };
-
-    if (modalMode === "add") payload.password = formPassword;
-    if (modalMode === "edit" && formPassword) payload.password = formPassword;
 
     try {
       if (modalMode === "add") {
@@ -242,8 +259,8 @@ export default function AdminAsistenPage() {
         Swal.fire({
           icon: "success",
           title: "Berhasil!",
-          text: "Asisten ditambahkan.",
-          timer: 1800,
+          text: "Asisten dibuat. Link aktivasi dikirim ke email.",
+          timer: 2000,
         });
       } else if (selectedAsisten) {
         await apiPut(`/api/admin/asisten/${selectedAsisten.id}`, payload);
@@ -261,7 +278,8 @@ export default function AdminAsistenPage() {
       Swal.fire({
         icon: "error",
         title: "Gagal",
-        text: err?.message || "Terjadi kesalahan.",
+        text:
+          err?.response?.data?.message || err?.message || "Terjadi kesalahan.",
       });
     }
   };
@@ -630,21 +648,36 @@ export default function AdminAsistenPage() {
 
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Password{" "}
-                  {modalMode === "add" && (
-                    <span className="text-red-500">*</span>
-                  )}
-                  {modalMode === "edit" && (
-                    <span className="text-xs text-gray-500">
-                      {" "}
-                      (kosongkan jika tidak diubah)
-                    </span>
-                  )}
+                  Jurusan <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="password"
-                  value={formPassword}
-                  onChange={(e) => setFormPassword(e.target.value)}
+                  type="text"
+                  value={formJurusan}
+                  onChange={(e) => setFormJurusan(e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Angkatan <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={formAngkatan}
+                  onChange={(e) => setFormAngkatan(e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  No. Telp
+                </label>
+                <input
+                  type="text"
+                  value={formNoTelp}
+                  onChange={(e) => setFormNoTelp(e.target.value)}
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                 />
               </div>

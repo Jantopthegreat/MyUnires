@@ -113,7 +113,7 @@ export default function LoginPage() {
             </div>
 
             <h1 className="text-5xl sm:text-6xl font-bold text-white tracking-tight">
-              UNIRES
+              MyUnires
             </h1>
             <div className="h-1 w-28 bg-gradient-to-r from-transparent via-white/90 to-transparent mx-auto mt-4" />
             <h2 className="mt-4 text-2xl sm:text-3xl font-semibold text-white/95">

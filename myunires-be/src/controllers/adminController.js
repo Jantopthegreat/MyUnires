@@ -555,10 +555,10 @@ export const getAsistenMusyrifById = async (req, res) => {
  */
 export const createAsistenMusyrif = async (req, res) => {
   try {
-    let { name, nim, email, usrohId } = req.body;
+    let { name, nim, email, jurusan, angkatan, noTelp, usrohId } = req.body;
 
-    if (!name || !nim || !email) {
-      return res.status(400).json({ message: "Nama, NIM, dan email wajib diisi (tanpa password)." });
+    if (!name || !nim || !email || !jurusan || !angkatan) {
+      return res.status(400).json({ message: "Nama, NIM, email, jurusan, angkatan wajib diisi." });
     }
 
     email = String(email).trim().toLowerCase();
@@ -566,65 +566,53 @@ export const createAsistenMusyrif = async (req, res) => {
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) return res.status(400).json({ message: "Email sudah terdaftar." });
 
+    // cek nim biar errornya lebih jelas (DB tetap enforce @unique)
+    const existingNim = await prisma.asistenMusyrif.findUnique({ where: { nim: String(nim) } });
+    if (existingNim) return res.status(400).json({ message: "NIM sudah terdaftar." });
+
     const activationToken = generateActivationToken();
     const activationTokenHash = hashToken(activationToken);
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
     const result = await prisma.$transaction(async (tx) => {
       const newUser = await tx.user.create({
-        data: {
-          name,
-          email,
-          password: null,
-          role: "ASISTEN",
-          isActive: false,
-        },
+        data: { name, email, password: null, role: "ASISTEN", isActive: false },
       });
 
       const newAsisten = await tx.asistenMusyrif.create({
         data: {
           userId: newUser.id,
-          // nim belum kamu simpan di tabel asisten; kalau di schema ada field nim, isi di sini
+          nim: String(nim),
+          jurusan: String(jurusan),
+          angkatan: Number(angkatan),
+          noTelp: noTelp ? String(noTelp) : null,
           usrohId: usrohId ? Number(usrohId) : null,
         },
       });
 
       await tx.accountActivationToken.create({
-        data: {
-          userId: newUser.id,
-          tokenHash: activationTokenHash,
-          expiresAt,
-        },
+        data: { userId: newUser.id, tokenHash: activationTokenHash, expiresAt },
       });
 
       return { newUser, newAsisten };
     });
 
-    // kirim email di luar transaksi
+    // email tetap di luar transaksi (bagus)
     const feUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     const activationLink = `${feUrl}/activate?token=${activationToken}`;
+    await sendActivationEmail(email, activationLink);
 
-    try {
-      await sendActivationEmail(email, activationLink);
-      return res.status(201).json({
-        success: true,
-        message: "Asisten musyrif berhasil ditambahkan. Link aktivasi sudah dikirim ke email.",
-        data: result,
-      });
-    } catch (mailErr) {
-      console.error("❌ Email activation gagal:", mailErr);
-      return res.status(201).json({
-        success: true,
-        message:
-          "Asisten musyrif berhasil ditambahkan, tapi email aktivasi gagal dikirim. Silakan coba kirim ulang aktivasi.",
-        data: result,
-      });
-    }
+    return res.status(201).json({
+      success: true,
+      message: "Asisten musyrif berhasil ditambahkan. Link aktivasi sudah dikirim ke email.",
+      data: result,
+    });
   } catch (error) {
     console.error("❌ Error createAsistenMusyrif:", error);
     return res.status(500).json({ message: "Terjadi kesalahan server." });
   }
 };
+
 
 /**
  * Update Asisten Musyrif (tanpa update password)
@@ -715,6 +703,7 @@ export const deleteAsistenMusyrif = async (req, res) => {
  * Import Asisten Musyrif dari Excel (tanpa password, kirim email aktivasi)
  * Kolom: name | email | nim | usrohId   (nim opsional, sesuaikan file kamu)
  */
+
 export const importAsistenMusyrif = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "File Excel tidak ditemukan." });
@@ -729,64 +718,126 @@ export const importAsistenMusyrif = async (req, res) => {
     }
 
     const created = [];
+    const emailFailed = [];
     const skipped = [];
 
     const feUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
-    for (const row of rows) {
-      const { name, email, nim, usrohId } = row;
-      if (!name || !email) {
-        skipped.push({ email, reason: "Kolom wajib kurang (name/email)" });
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+
+      const name = row?.name ?? row?.Name ?? row?.nama ?? row?.Nama;
+      const email = row?.email ?? row?.Email;
+      const nim = row?.nim ?? row?.NIM ?? row?.Nim;
+      const jurusan = row?.jurusan ?? row?.Jurusan;
+      const angkatan = row?.angkatan ?? row?.Angkatan;
+      const noTelp = row?.noTelp ?? row?.NoTelp ?? row?.no_telp ?? row?.No_Telp;
+      const usrohId = row?.usrohId ?? row?.UsrohId ?? row?.usroh_id ?? row?.Usroh_ID;
+
+      // Validasi kolom wajib
+      if (!name || !email || !nim || !jurusan || !angkatan) {
+        skipped.push({
+          row: i + 2, // biasanya header di row 1
+          email: email ? String(email).trim().toLowerCase() : null,
+          reason: "Kolom wajib kurang (name/email/nim/jurusan/angkatan).",
+        });
         continue;
       }
 
       const emailStr = String(email).trim().toLowerCase();
+      const nimStr = String(nim).trim();
+      const jurusanStr = String(jurusan).trim();
+      const angkatanNum = Number(angkatan);
 
-      const existing = await prisma.user.findUnique({ where: { email: emailStr } });
-      if (existing) {
-        skipped.push({ email: emailStr, reason: "Email sudah ada" });
+      if (!Number.isFinite(angkatanNum)) {
+        skipped.push({
+          row: i + 2,
+          email: emailStr,
+          reason: "Angkatan harus angka.",
+        });
         continue;
       }
 
+      // Generate token (yang dikirim ke email)
       const activationToken = generateActivationToken();
       const tokenHash = hashToken(activationToken);
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 jam
 
-      // create user + asisten + token (transaction)
-      const { user } = await prisma.$transaction(async (tx) => {
-        const user = await tx.user.create({
-          data: {
-            name: String(name),
+      // 1) Create user+asisten+token (DB dulu)
+      // email dikirim setelahnya (sesuai best practice: hindari transaksi tergantung layanan eksternal)
+      let createdUser = null;
+
+      try {
+        const result = await prisma.$transaction(async (tx) => {
+          const user = await tx.user.create({
+            data: {
+              name: String(name).trim(),
+              email: emailStr,
+              password: null,
+              role: "ASISTEN",
+              isActive: false,
+            },
+          });
+
+          await tx.asistenMusyrif.create({
+            data: {
+              userId: user.id,
+              nim: nimStr,
+              jurusan: jurusanStr,
+              angkatan: angkatanNum,
+              noTelp: noTelp ? String(noTelp).trim() : null,
+              usrohId: usrohId ? Number(usrohId) : null,
+            },
+          });
+
+          await tx.accountActivationToken.create({
+            data: { userId: user.id, tokenHash, expiresAt },
+          });
+
+          return { user };
+        });
+
+        createdUser = result.user;
+      } catch (err) {
+        // Handle unique constraint (email atau nim duplikat)
+        
+        if (err?.code === "P2002") {
+          skipped.push({
+            row: i + 2,
             email: emailStr,
-            password: null,
-            role: "ASISTEN",
-            isActive: false,
-          },
+            reason: "Duplikat (email atau NIM sudah terdaftar).",
+          });
+          continue;
+        }
+
+        skipped.push({
+          row: i + 2,
+          email: emailStr,
+          reason: "Gagal insert ke database.",
         });
+        console.error("❌ Import row DB error:", { row: i + 2, email: emailStr, err });
+        continue;
+      }
 
-        await tx.asistenMusyrif.create({
-          data: {
-            userId: user.id,
-            usrohId: usrohId ? Number(usrohId) : null,
-            // nim: nim ? String(nim) : null, // kalau ada field nim di model asisten
-          },
-        });
-
-        await tx.accountActivationToken.create({
-          data: { userId: user.id, tokenHash, expiresAt },
-        });
-
-        return { user };
-      });
-
-      // kirim email per user
+      // 2) Kirim email aktivasi
       const activationLink = `${feUrl}/activate?token=${activationToken}`;
       try {
-        await sendActivationEmail(user.email, activationLink);
-        created.push({ name: user.name, email: user.email });
+        await sendActivationEmail(emailStr, activationLink);
+
+        created.push({
+          row: i + 2,
+          name: createdUser.name,
+          email: createdUser.email,
+        });
       } catch (mailErr) {
-        console.error(`❌ Email activation gagal (${user.email}):`, mailErr);
-        skipped.push({ email: user.email, reason: "Gagal kirim email aktivasi" });
+        // Data sudah masuk DB, tapi email gagal -> jangan masuk "skipped"
+        // Biar FE bisa tampilkan: “berhasil dibuat tapi email gagal”.
+        emailFailed.push({
+          row: i + 2,
+          email: emailStr,
+          reason: "Akun dibuat tapi gagal kirim email aktivasi. Gunakan fitur resend activation.",
+        });
+        console.error("❌ Email activation gagal:", { row: i + 2, email: emailStr, mailErr });
       }
     }
 
@@ -794,15 +845,21 @@ export const importAsistenMusyrif = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: `Berhasil mengimpor ${created.length} data asisten musyrif.`,
-      data: created,
+      message: `Import selesai. Created: ${created.length}, Email failed: ${emailFailed.length}, Skipped: ${skipped.length}.`,
+      created,
+      emailFailed,
       skipped,
     });
   } catch (error) {
     console.error("❌ Error importAsistenMusyrif:", error);
+    // pastikan file dibersihkan
+    try {
+      if (req?.file?.path) fs.unlinkSync(req.file.path);
+    } catch {}
     return res.status(500).json({ message: "Terjadi kesalahan saat import Excel." });
   }
 };
+
 
 
 /* ==========================================================
@@ -876,41 +933,66 @@ export const getMusyrifById = async (req, res) => {
 /**
  * Tambah Musyrif baru
  */
+
 export const createMusyrif = async (req, res) => {
   try {
-    const { name, email, password, lantaiId } = req.body;
+    let { name, email, lantaiId } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: "Nama, email, dan password wajib diisi." });
+    if (!name || !email) {
+      return res.status(400).json({ message: "Nama dan email wajib diisi." });
     }
+
+    email = String(email).trim().toLowerCase();
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) return res.status(400).json({ message: "Email sudah terdaftar." });
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const token = generateActivationToken();
+    const tokenHash = hashToken(token);
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 jam
 
     const result = await prisma.$transaction(async (tx) => {
       const newUser = await tx.user.create({
-        data: { name, email, password: hashedPassword, role: "MUSYRIF" },
+        data: {
+          name: String(name).trim(),
+          email,
+          password: null,
+          role: "MUSYRIF",
+          isActive: false,
+        },
       });
 
       const newMusyrif = await tx.musyrif.create({
-        data: { userId: newUser.id, lantaiId: lantaiId || null },
+        data: { userId: newUser.id, lantaiId: lantaiId ? Number(lantaiId) : null },
+      });
+
+      await tx.accountActivationToken.create({
+        data: { userId: newUser.id, tokenHash, expiresAt },
       });
 
       return { newUser, newMusyrif };
     });
 
-    res.status(201).json({
+    // kirim email di luar transaksi
+    const feUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const activationLink = `${feUrl}/activate?token=${token}`;
+    await sendActivationEmail(email, activationLink);
+
+    return res.status(201).json({
       success: true,
-      message: "Musyrif berhasil ditambahkan.",
-      data: result,
+      message: "Musyrif berhasil ditambahkan. Link aktivasi sudah dikirim ke email.",
+      data: {
+        userId: result.newUser.id,
+        musyrifId: result.newMusyrif.id,
+        email: result.newUser.email,
+      },
     });
   } catch (error) {
     console.error("❌ Error createMusyrif:", error);
-    res.status(500).json({ message: "Terjadi kesalahan server." });
+    return res.status(500).json({ message: "Terjadi kesalahan server." });
   }
 };
+
 
 /**
  * Update data Musyrif
@@ -985,6 +1067,7 @@ export const deleteMusyrif = async (req, res) => {
  * Import Musyrif dari Excel
  * Kolom: name | email | password | lantaiId
  */
+
 export const importMusyrif = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "File Excel tidak ditemukan." });
@@ -999,39 +1082,99 @@ export const importMusyrif = async (req, res) => {
     }
 
     const created = [];
+    const emailFailed = [];
+    const skipped = [];
 
-    for (const row of rows) {
-      const { name, email, password, lantaiId } = row;
-      if (!name || !email || !password) continue;
+    const feUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
-      const existing = await prisma.user.findUnique({ where: { email } });
-      if (existing) continue;
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
 
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const name = row?.name ?? row?.Name ?? row?.nama ?? row?.Nama;
+      const email = row?.email ?? row?.Email;
+      const lantaiId = row?.lantaiId ?? row?.LantaiId ?? row?.lantai_id ?? row?.Lantai_ID;
 
-      const user = await prisma.user.create({
-        data: { name, email, password: hashedPassword, role: "MUSYRIF" },
-      });
+      if (!name || !email) {
+        skipped.push({ row: i + 2, email: email ? String(email) : null, reason: "Kolom wajib kurang (name/email)." });
+        continue;
+      }
 
-      await prisma.musyrif.create({
-        data: { userId: user.id, lantaiId: lantaiId || null },
-      });
+      const emailStr = String(email).trim().toLowerCase();
 
-      created.push({ name, email });
+      const token = generateActivationToken();
+      const tokenHash = hashToken(token);
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+      let createdUser = null;
+
+      try {
+        const result = await prisma.$transaction(async (tx) => {
+          const user = await tx.user.create({
+            data: {
+              name: String(name).trim(),
+              email: emailStr,
+              password: null,
+              role: "MUSYRIF",
+              isActive: false,
+            },
+          });
+
+          await tx.musyrif.create({
+            data: { userId: user.id, lantaiId: lantaiId ? Number(lantaiId) : null },
+          });
+
+          await tx.accountActivationToken.create({
+            data: { userId: user.id, tokenHash, expiresAt },
+          });
+
+          return { user };
+        });
+
+        createdUser = result.user;
+      } catch (err) {
+        if (err?.code === "P2002") {
+          skipped.push({ row: i + 2, email: emailStr, reason: "Duplikat (email sudah terdaftar)." });
+          continue;
+        }
+
+        skipped.push({ row: i + 2, email: emailStr, reason: "Gagal insert ke database." });
+        console.error("❌ Import musyrif DB error:", { row: i + 2, email: emailStr, err });
+        continue;
+      }
+
+      // send email after DB insert
+      const activationLink = `${feUrl}/activate?token=${token}`;
+      try {
+        await sendActivationEmail(emailStr, activationLink);
+        created.push({ row: i + 2, name: createdUser.name, email: createdUser.email });
+      } catch (mailErr) {
+        emailFailed.push({
+          row: i + 2,
+          email: emailStr,
+          reason: "Akun dibuat tapi gagal kirim email aktivasi. Gunakan fitur resend activation.",
+        });
+        console.error("❌ Email activation gagal:", { row: i + 2, email: emailStr, mailErr });
+      }
     }
 
     fs.unlinkSync(req.file.path);
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
-      message: `Berhasil mengimpor ${created.length} data musyrif.`,
-      data: created,
+      message: `Import selesai. Created: ${created.length}, Email failed: ${emailFailed.length}, Skipped: ${skipped.length}.`,
+      created,
+      emailFailed,
+      skipped,
     });
   } catch (error) {
     console.error("❌ Error importMusyrif:", error);
-    res.status(500).json({ message: "Terjadi kesalahan saat import Excel." });
+    try {
+      if (req?.file?.path) fs.unlinkSync(req.file.path);
+    } catch {}
+    return res.status(500).json({ message: "Terjadi kesalahan saat import Excel." });
   }
 };
+
 
 /* ==========================================================
    ✅ KELOLA GEDUNG, LANTAI, & USROH (oleh Admin)
@@ -1379,34 +1522,35 @@ export const getAllMateri = async (req, res) => {
  */
 export const createMateri = async (req, res) => {
   try {
-    const { judul, deskripsi } = req.body;
+    const { judul, deskripsi, kategoriId } = req.body;
 
     if (!judul) return res.status(400).json({ message: "Judul materi wajib diisi." });
+    if (!kategoriId) return res.status(400).json({ message: "Kategori wajib dipilih." });
 
-    // Jika ada file yang diupload (PDF, PPT, dll)
     let fileUrl = null;
-    if (req.file) {
-      fileUrl = `/uploads/materi/${req.file.filename}`;
-    }
+    if (req.file) fileUrl = `/uploads/materi/${req.file.filename}`;
 
     const newMateri = await prisma.materi.create({
       data: {
-        judul,
-        deskripsi: deskripsi || null,
+        judul: String(judul).trim(),
+        deskripsi: deskripsi ? String(deskripsi).trim() : null,
         fileUrl,
+        kategoriId: Number(kategoriId),
       },
+      include: { kategori: { select: { id: true, nama: true } } },
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "Materi berhasil ditambahkan.",
       data: newMateri,
     });
   } catch (error) {
     console.error("❌ Error createMateri:", error);
-    res.status(500).json({ message: "Terjadi kesalahan server." });
+    return res.status(500).json({ message: "Terjadi kesalahan server." });
   }
 };
+
 
 /**
  * Update materi (judul, deskripsi, atau file)
@@ -1414,33 +1558,33 @@ export const createMateri = async (req, res) => {
 export const updateMateri = async (req, res) => {
   try {
     const { id } = req.params;
-    const { judul, deskripsi } = req.body;
+    const { judul, deskripsi, kategoriId } = req.body;
 
     const materi = await prisma.materi.findUnique({ where: { id: Number(id) } });
     if (!materi) return res.status(404).json({ message: "Materi tidak ditemukan." });
 
     let fileUrl = materi.fileUrl;
-    if (req.file) {
-      fileUrl = `/uploads/materi/${req.file.filename}`;
-    }
+    if (req.file) fileUrl = `/uploads/materi/${req.file.filename}`;
 
     const updatedMateri = await prisma.materi.update({
       where: { id: Number(id) },
       data: {
-        judul: judul || materi.judul,
-        deskripsi: deskripsi || materi.deskripsi,
+        ...(judul !== undefined ? { judul: String(judul).trim() } : {}),
+        ...(deskripsi !== undefined ? { deskripsi: deskripsi ? String(deskripsi).trim() : null } : {}),
+        ...(kategoriId !== undefined ? { kategoriId: Number(kategoriId) } : {}),
         fileUrl,
       },
+      include: { kategori: { select: { id: true, nama: true } } },
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Materi berhasil diperbarui.",
       data: updatedMateri,
     });
   } catch (error) {
     console.error("❌ Error updateMateri:", error);
-    res.status(500).json({ message: "Terjadi kesalahan server." });
+    return res.status(500).json({ message: "Terjadi kesalahan server." });
   }
 };
 
@@ -1915,3 +2059,23 @@ export const exportNilaiTahfidz = async (req, res) => {
     res.status(500).json({ message: "Gagal mengekspor data nilai tahfidz." });
   }
 };
+
+
+export const getAllKategoriMateri = async (req, res) => {
+  try {
+    const data = await prisma.kategoriMateri.findMany({
+      select: { id: true, nama: true },
+      orderBy: { nama: "asc" },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Data kategori materi berhasil diambil.",
+      data,
+    });
+  } catch (e) {
+    console.error("❌ getAllKategoriMateri:", e);
+    return res.status(500).json({ message: "Terjadi kesalahan server." });
+  }
+};
+

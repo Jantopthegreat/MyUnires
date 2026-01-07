@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Sidebar_Musyrif from "@/components/sidebar_musyrif";
 import LogoutModal from "@/components/LogoutModal";
-import { apiGet } from "@/lib/api";
+import { apiGet, clearAuth } from "@/lib/api";
 
 type ResidentItem = {
   id: number;
@@ -50,17 +51,17 @@ function StatCard({
 }
 
 export default function DashboardMusyrifPage() {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const [residents, setResidents] = useState<ResidentItem[]>([]);
   const [nilaiDetail, setNilaiDetail] = useState<NilaiTahfidzDetailRow[]>([]);
   const [loading, setLoading] = useState(true);
   // Fungsi handleLogout
-  const handleLogout = () => {    
+  const handleLogout = () => {
     if (typeof window !== "undefined") {
-      localStorage.removeItem("token");     
+      localStorage.removeItem("token");
     }
     window.location.href = "/login";
   };
@@ -96,6 +97,11 @@ export default function DashboardMusyrifPage() {
       active = false;
     };
   }, []);
+
+  const handleLogout = () => {
+    clearAuth();
+    router.push("/login");
+  };
 
   const stats = useMemo(() => {
     const totalResident = residents.length;
@@ -138,6 +144,31 @@ export default function DashboardMusyrifPage() {
             </svg>
           </button>
 
+          {showLogoutModal && (
+            <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 w-full max-w-sm text-center">
+                <h2 className="text-xl font-semibold text-[#004220] mb-3">
+                  Log Out
+                </h2>
+                <p className="text-gray-600 text-sm mb-6">Akhiri sesi login?</p>
+                <div className="flex justify-center gap-3">
+                  <button
+                    onClick={() => setShowLogoutModal(false)}
+                    className="px-5 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"
+                  >
+                    Log Out
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <img
             src="/lg_umy.svg"
             alt="UMY"
@@ -145,7 +176,7 @@ export default function DashboardMusyrifPage() {
           />
           <img
             src="/lg_unires.svg"
-            alt="UNIRES"
+            alt="MyUnires"
             className="h-7 sm:h-8 w-auto object-contain shrink-0"
           />
         </div>

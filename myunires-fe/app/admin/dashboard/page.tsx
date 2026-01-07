@@ -389,7 +389,7 @@ export default function AdminDashboard() {
         <div className="w-full mx-auto max-w-7xl px-6 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <img src="/lg_umy.svg" alt="UMY" className="h-8" />
-            <img src="/lg_unires.svg" alt="UNIRES" className="h-8" />
+            <img src="/lg_unires.svg" alt="MyUnires" className="h-8" />
           </div>
         </div>
       </header>
