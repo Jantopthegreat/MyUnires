@@ -13,10 +13,13 @@ import {
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import LogoutModal from "@/components/LogoutModal";
+import { clearAuth } from "@/lib/api";
+
 type Props = {
-  isOpen: boolean; // desktop: expanded vs mini
-  toggleSidebar: () => void; // desktop toggle
-  mobileOpen: boolean; // mobile drawer open
+  isOpen: boolean;
+  toggleSidebar: () => void;
+  mobileOpen: boolean;
   setMobileOpen: (v: boolean) => void;
 };
 
@@ -40,8 +43,8 @@ export default function Sidebar_Resident({
 
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  // Fetch user profile
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -113,10 +116,12 @@ export default function Sidebar_Resident({
     setMobileOpen(false);
   };
 
+  // REVISI: logout konsisten (clearAuth + router.replace)
   const handleLogout = () => {
-    localStorage.removeItem("token");
+    clearAuth();
+    setShowLogoutModal(false);
     setMobileOpen(false);
-    window.location.href = "/login";
+    router.replace("/login");
   };
 
   const ProfileBlock = ({ compact }: { compact: boolean }) => (
@@ -198,7 +203,7 @@ export default function Sidebar_Resident({
       <div className="rounded-2xl border bg-white overflow-hidden">
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={() => setShowLogoutModal(true)} // REVISI: buka modal
           className={[
             "w-full flex items-center gap-3 px-3 py-3 transition",
             "text-red-700 hover:bg-red-50",
@@ -209,8 +214,6 @@ export default function Sidebar_Resident({
           <FiLogOut size={18} />
           {!compact && <span className="text-sm font-semibold">Logout</span>}
         </button>
-
-        {/* strip hijau bawah (biar konsisten branding) */}
       </div>
     </div>
   );
@@ -224,7 +227,6 @@ export default function Sidebar_Resident({
           mobileOpen ? "pointer-events-auto" : "pointer-events-none",
         ].join(" ")}
       >
-        {/* backdrop */}
         <div
           onClick={() => setMobileOpen(false)}
           className={[
@@ -233,7 +235,6 @@ export default function Sidebar_Resident({
           ].join(" ")}
         />
 
-        {/* panel */}
         <aside
           className={[
             "absolute left-0 top-16 bottom-0 w-[280px] bg-white border-r shadow-xl",
@@ -265,7 +266,7 @@ export default function Sidebar_Resident({
         </aside>
       </div>
 
-      {/* ===== DESKTOP SIDEBAR (fixed) ===== */}
+      {/* ===== DESKTOP SIDEBAR ===== */}
       <aside
         className={[
           "hidden md:flex fixed top-16 left-0 bottom-0 z-20",
@@ -273,7 +274,6 @@ export default function Sidebar_Resident({
           isOpen ? "w-64" : "w-14",
         ].join(" ")}
       >
-        {/* toggle desktop collapse */}
         <div
           className={[
             "h-12 flex items-center",
@@ -300,6 +300,13 @@ export default function Sidebar_Resident({
 
         <BottomActions compact={!isOpen} />
       </aside>
+
+      {/* REVISI: modal logout */}
+      <LogoutModal
+        open={showLogoutModal}
+        onCancel={() => setShowLogoutModal(false)}
+        onLogout={handleLogout}
+      />
     </>
   );
 }

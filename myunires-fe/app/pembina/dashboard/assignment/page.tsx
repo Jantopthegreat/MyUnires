@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { FaSearch, FaPlus } from "react-icons/fa";
+import { apiGet, apiPost, apiPut, apiDelete, apiUpload } from "@/lib/api";
 import Sidebar_Musyrif from "@/components/sidebar_musyrif";
 import CustomSelect from "@/components/CustomSelect";
 import Swal from "sweetalert2";
@@ -174,21 +175,9 @@ export default function AssignmentPage() {
   // Fetch assignments
   const fetchAssignments = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(
-        "http://localhost:3001/api/musyrif/assignments",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      if (response.ok) {
-        const result = await response.json();
-        const data = result.data || result;
-        setAssignments(Array.isArray(data) ? data : []);
-      } else {
-        console.error("Response not OK:", response.status);
-      }
+      const result = await apiGet<any>("/api/musyrif/assignments");
+      const data = result?.data ?? result;
+      setAssignments(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching assignments:", error);
     }
@@ -196,19 +185,9 @@ export default function AssignmentPage() {
 
   const fetchKategori = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(
-        "http://localhost:3001/api/musyrif/kategori",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      if (response.ok) {
-        const result = await response.json();
-        const data = result.data || result;
-        setKategoriList(Array.isArray(data) ? data : []);
-      }
+      const result = await apiGet<any>("/api/musyrif/kategori");
+      const data = result?.data ?? result;
+      setKategoriList(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching kategori:", error);
     }
@@ -216,22 +195,14 @@ export default function AssignmentPage() {
 
   const fetchMateri = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(
-        "http://localhost:3001/api/musyrif/materi/all",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const result = await apiGet<any>("/api/musyrif/materi/all");
+      const data = result?.data ?? result;
 
-      if (response.ok) {
-        const result = await response.json();
-        const data = result.data || result;
-        const materiWithNumberKategoriId = Array.isArray(data)
-          ? data.map((m) => ({ ...m, kategoriId: Number(m.kategoriId) }))
-          : [];
-        setMateriList(materiWithNumberKategoriId);
-      }
+      const materiWithNumberKategoriId = Array.isArray(data)
+        ? data.map((m) => ({ ...m, kategoriId: Number(m.kategoriId) }))
+        : [];
+
+      setMateriList(materiWithNumberKategoriId);
     } catch (error) {
       console.error("Error fetching materi:", error);
     }
@@ -297,31 +268,20 @@ export default function AssignmentPage() {
     if (!selectedAssignment) return;
 
     try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(
-        `http://localhost:3001/api/musyrif/assignments/${selectedAssignment.id}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      await apiDelete(`/api/musyrif/assignments/${selectedAssignment.id}`);
 
-      if (response.ok) {
-        Swal.fire({
-          icon: "success",
-          title: "Assignment berhasil dihapus",
-          showConfirmButton: true,
-          confirmButtonColor: "#22c55e",
-          confirmButtonText: "OK",
-          timer: 3000,
-        });
+      Swal.fire({
+        icon: "success",
+        title: "Assignment berhasil dihapus",
+        showConfirmButton: true,
+        confirmButtonColor: "#22c55e",
+        confirmButtonText: "OK",
+        timer: 3000,
+      });
 
-        fetchAssignments();
-        setShowDeleteModal(false);
-        setSelectedAssignment(null);
-      } else {
-        throw new Error("Gagal menghapus assignment");
-      }
+      fetchAssignments();
+      setShowDeleteModal(false);
+      setSelectedAssignment(null);
     } catch (error) {
       console.error("Error deleting assignment:", error);
       Swal.fire("Error", "Gagal menghapus assignment", "error");
@@ -349,73 +309,43 @@ export default function AssignmentPage() {
     let uploadedImageUrl: string | undefined = undefined;
 
     try {
-      const token = localStorage.getItem("token");
-
+      // 1) upload dulu kalau ada file
       if (soalImageFile) {
         const fd = new FormData();
         fd.append("file", soalImageFile);
 
-        const uploadResp = await fetch(
-          "http://localhost:3001/api/musyrif/assignments/upload",
-          {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
-            body: fd,
-          }
+        const uploadJson = await apiUpload<any>(
+          "/api/musyrif/assignments/upload",
+          fd
         );
-
-        if (uploadResp.ok) {
-          const uploadJson = await uploadResp.json();
-          uploadedImageUrl = uploadJson.url;
-        } else {
-          console.error("Upload failed:", uploadResp.status);
-          throw new Error("Gagal mengupload gambar");
-        }
+        uploadedImageUrl = uploadJson?.url;
       }
 
+      // 2) submit assignment
       const payload = {
         ...formData,
         materiId: Number(formData.materiId),
         ...(uploadedImageUrl && { soalImageUrl: uploadedImageUrl }),
       };
 
-      const response = await fetch(
-        "http://localhost:3001/api/musyrif/assignments",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      await apiPost("/api/musyrif/assignments", payload);
 
-      if (response.ok) {
-        Swal.fire({
-          icon: "success",
-          title: "Assignment berhasil ditambahkan",
-          showConfirmButton: true,
-          confirmButtonColor: "#22c55e",
-          confirmButtonText: "OK",
-          timer: 3000,
-        });
+      Swal.fire({
+        icon: "success",
+        title: "Assignment berhasil ditambahkan",
+        showConfirmButton: true,
+        confirmButtonColor: "#22c55e",
+        confirmButtonText: "OK",
+        timer: 3000,
+      });
 
-        fetchAssignments();
-        setShowAddModal(false);
-        resetForm();
-      } else {
-        let errorData: any = null;
-        try {
-          errorData = await response.json();
-        } catch {}
-        throw new Error(
-          errorData?.message || `Failed to save (status ${response.status})`
-        );
-      }
+      fetchAssignments();
+      setShowAddModal(false);
+      resetForm();
     } catch (error: any) {
       console.error("Error saving assignment:", error);
 
+      // fallback: kalau gagal saat simpan + sebelumnya sempat upload gambar
       if (uploadedImageUrl) {
         const result = await Swal.fire({
           icon: "error",
@@ -428,47 +358,23 @@ export default function AssignmentPage() {
 
         if (result.isConfirmed) {
           try {
-            const token = localStorage.getItem("token");
             const retryPayload = {
               ...formData,
               materiId: Number(formData.materiId),
             };
 
-            const retryResp = await fetch(
-              "http://localhost:3001/api/musyrif/assignments",
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify(retryPayload),
-              }
-            );
+            await apiPost("/api/musyrif/assignments", retryPayload);
 
-            if (retryResp.ok) {
-              Swal.fire({
-                icon: "success",
-                title: "Assignment berhasil ditambahkan tanpa gambar",
-                timer: 2000,
-              });
-              fetchAssignments();
-              setShowAddModal(false);
-              resetForm();
-              return;
-            } else {
-              let retryErr: any = null;
-              try {
-                retryErr = await retryResp.json();
-              } catch {}
-              Swal.fire(
-                "Error",
-                retryErr?.message ||
-                  `Gagal menyimpan (status ${retryResp.status})`,
-                "error"
-              );
-              return;
-            }
+            Swal.fire({
+              icon: "success",
+              title: "Assignment berhasil ditambahkan tanpa gambar",
+              timer: 2000,
+            });
+
+            fetchAssignments();
+            setShowAddModal(false);
+            resetForm();
+            return;
           } catch (retryError: any) {
             Swal.fire(
               "Error",
@@ -509,31 +415,21 @@ export default function AssignmentPage() {
     }
 
     try {
-      const token = localStorage.getItem("token");
       let uploadedImageUrl: string | undefined = undefined;
 
+      // 1) upload dulu kalau ada file baru
       if (soalImageFile) {
         const fd = new FormData();
         fd.append("file", soalImageFile);
 
-        const uploadResp = await fetch(
-          "http://localhost:3001/api/musyrif/assignments/upload",
-          {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
-            body: fd,
-          }
+        const uploadJson = await apiUpload<any>(
+          "/api/musyrif/assignments/upload",
+          fd
         );
-
-        if (uploadResp.ok) {
-          const uploadJson = await uploadResp.json();
-          uploadedImageUrl = uploadJson.url;
-        } else {
-          console.error("Upload failed:", uploadResp.status);
-          throw new Error("Gagal mengupload gambar");
-        }
+        uploadedImageUrl = uploadJson?.url;
       }
 
+      // 2) payload update
       const payload = {
         ...formData,
         materiId: Number(formData.materiId),
@@ -543,41 +439,24 @@ export default function AssignmentPage() {
         ...(uploadedImageUrl ? { soalImageUrl: uploadedImageUrl } : {}),
       };
 
-      const response = await fetch(
-        `http://localhost:3001/api/musyrif/assignments/${selectedAssignment.id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        }
+      await apiPut(
+        `/api/musyrif/assignments/${selectedAssignment.id}`,
+        payload
       );
 
-      if (response.ok) {
-        Swal.fire({
-          icon: "success",
-          title: "Assignment berhasil diupdate",
-          showConfirmButton: true,
-          confirmButtonColor: "#22c55e",
-          confirmButtonText: "OK",
-          timer: 3000,
-        });
+      Swal.fire({
+        icon: "success",
+        title: "Assignment berhasil diupdate",
+        showConfirmButton: true,
+        confirmButtonColor: "#22c55e",
+        confirmButtonText: "OK",
+        timer: 3000,
+      });
 
-        fetchAssignments();
-        setShowEditModal(false);
-        setSelectedAssignment(null);
-        resetForm();
-      } else {
-        let errorData: any = null;
-        try {
-          errorData = await response.json();
-        } catch {}
-        throw new Error(
-          errorData?.message || `Failed to update (status ${response.status})`
-        );
-      }
+      fetchAssignments();
+      setShowEditModal(false);
+      setSelectedAssignment(null);
+      resetForm();
     } catch (error: any) {
       console.error("Error updating assignment:", error);
       Swal.fire(

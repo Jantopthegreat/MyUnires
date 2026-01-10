@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { FaArrowLeft, FaClipboardList, FaCheckCircle } from "react-icons/fa";
 import { FiMenu } from "react-icons/fi";
 import Sidebar_Resident from "@/components/Sidebar_Resident";
+import { apiGet, apiPost } from "@/lib/api";
 
 interface KategoriMateri {
   id: number;
@@ -55,52 +56,29 @@ export default function KerjakanAssignmentPage() {
   } | null>(null);
 
   useEffect(() => {
-    const fetchKategori = async () => {
+    const run = async () => {
+      setLoading(true);
       try {
-        const token = localStorage.getItem("token");
-        const response = await fetch(
-          "http://localhost:3001/api/resident/kategori",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-        const result = await response.json();
-        const data = result.data || result.kategori || result;
-        setKategoriList(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error fetching kategori:", error);
-        setKategoriList([]);
-      }
-    };
+        const [katRes, asgRes] = await Promise.all([
+          apiGet<any>("/api/resident/kategori"),
+          apiGet<any>("/api/resident/assignments"),
+        ]);
 
-    const fetchAssignments = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const response = await fetch(
-          "http://localhost:3001/api/resident/assignments",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-        const result = await response.json();
-        const data = result.data || result.assignments || result;
-        setAssignmentList(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error fetching assignments:", error);
+        const kategori = katRes?.data || katRes?.kategori || katRes;
+        const assignments = asgRes?.data || asgRes?.assignments || asgRes;
+
+        setKategoriList(Array.isArray(kategori) ? kategori : []);
+        setAssignmentList(Array.isArray(assignments) ? assignments : []);
+      } catch (e) {
+        console.error(e);
+        setKategoriList([]);
         setAssignmentList([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchKategori();
-    fetchAssignments();
+    run();
   }, []);
 
   const filteredAssignments = useMemo(() => {
@@ -133,20 +111,18 @@ export default function KerjakanAssignmentPage() {
     });
 
     try {
-      const token = localStorage.getItem("token");
-      await fetch("http://localhost:3001/api/resident/assignment/submit", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          assignmentId: selectedAssignment.id,
-          jawabanUser: selectedAnswer,
-        }),
+      await apiPost<any>("/api/resident/assignment/submit", {
+        assignmentId: selectedAssignment.id,
+        jawabanUser: selectedAnswer,
       });
+
+      // optional: kalau mau update list / refresh
+      // fetchAssignments();
     } catch (error) {
       console.error("Error submitting answer:", error);
+
+      // optional: kasih alert kalau submit ke server gagal
+      // Swal.fire({ icon: "error", title: "Gagal", text: "Jawaban gagal dikirim ke server." });
     }
   };
 

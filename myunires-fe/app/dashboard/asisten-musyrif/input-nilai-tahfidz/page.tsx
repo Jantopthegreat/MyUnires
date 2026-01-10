@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { FaSearch, FaPlus } from "react-icons/fa";
 import Swal from "sweetalert2";
 import { apiGet, apiPost, clearAuth } from "@/lib/api";
@@ -53,7 +53,6 @@ export default function InputNilaiTahfidzPage() {
   const toggleSidebar = () => setIsOpen((prev) => !prev);
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Data states
   const [nilaiList, setNilaiList] = useState<NilaiTahfidzData[]>([]);
@@ -217,65 +216,6 @@ export default function InputNilaiTahfidzPage() {
     });
   };
 
-  const handleImportClick = () => fileInputRef.current?.click();
-
-  const handleFileUpload = async (file: File) => {
-    if (!file) return;
-
-    if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
-      Swal.fire({
-        icon: "error",
-        title: "Format File Salah",
-        text: "Harap upload file Excel (.xlsx atau .xls)",
-      });
-      return;
-    }
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const response = await fetch("/api/asisten/tahfidz/import", {
-        method: "POST",
-        body: formData,
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        Swal.fire({
-          icon: "success",
-          title: "Berhasil!",
-          html: `
-            <p>${result.message}</p>
-            <p class="mt-2">Berhasil: ${result.imported || 0}</p>
-            ${
-              result.errors?.length > 0
-                ? `<p class="text-red-600">Gagal: ${result.errors.length}</p>`
-                : ""
-            }
-          `,
-          confirmButtonColor: "#22c55e",
-        });
-        fetchAllData();
-      } else {
-        Swal.fire({
-          icon: "error",
-          title: "Gagal Import",
-          text: result.message || "Terjadi kesalahan saat import data.",
-        });
-      }
-    } catch (error) {
-      console.error("Error uploading:", error);
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: "Gagal mengupload file ke server.",
-      });
-    }
-  };
-
   const handleSaveNilai = async () => {
     if (!formResidentId || !formTargetId || !formStatus || !formNilaiHuruf) {
       Swal.fire({
@@ -431,32 +371,6 @@ export default function InputNilaiTahfidzPage() {
                   </option>
                 ))}
               </select>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleFileUpload(file);
-                }}
-                className="hidden"
-              />
-              <button
-                onClick={handleImportClick}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm"
-              >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M12 3v12m0 0l-3-3m3 3l3-3M5 21h14" />
-                </svg>
-                Impor Data
-              </button>
             </div>
 
             <button

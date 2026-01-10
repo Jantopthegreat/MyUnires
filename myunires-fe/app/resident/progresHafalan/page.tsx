@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Sidebar_Resident from "@/components/Sidebar_Resident";
 import Swal from "sweetalert2";
 import { FiMenu } from "react-icons/fi";
+import { apiGet } from "@/lib/api";
 
 interface NilaiTahfidz {
   id: number;
@@ -54,21 +55,15 @@ export default function ProgresHafalanPage() {
     const fetchProgressData = async () => {
       setLoading(true);
       try {
-        const token = localStorage.getItem("token");
-        const response = await fetch(
-          "http://localhost:3001/api/resident/tahfidz/nilai",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-
-        const data = await response.json();
-        if (!data.success) throw new Error(data.message || "Gagal memuat data");
+        const data = await apiGet<any>("/api/resident/tahfidz/nilai");
+        if (!data?.success)
+          throw new Error(data?.message || "Gagal memuat data");
 
         const nilaiList: NilaiTahfidz[] = data.data;
 
-        const currentMonth = new Date().getMonth(); // 0-11
-        const currentYear = new Date().getFullYear();
+        const now = new Date();
+        const currentMonth = now.getMonth(); // 0-11
+        const currentYear = now.getFullYear();
 
         const progressPerBulan = BULAN_NAMES.map((namaBulan, index) => {
           const nilaiDiBulanIni = nilaiList.filter((nilai) => {
@@ -89,12 +84,11 @@ export default function ProgresHafalanPage() {
         });
 
         // reorder: current month first
-        const reordered: ProgressBulan[] = [];
-        reordered.push(progressPerBulan[currentMonth]);
-        for (let i = currentMonth + 1; i <= 11; i++)
-          reordered.push(progressPerBulan[i]);
-        for (let i = 0; i < currentMonth; i++)
-          reordered.push(progressPerBulan[i]);
+        const reordered: ProgressBulan[] = [
+          progressPerBulan[currentMonth],
+          ...progressPerBulan.slice(currentMonth + 1),
+          ...progressPerBulan.slice(0, currentMonth),
+        ];
 
         setProgressData(reordered);
       } catch (error: any) {

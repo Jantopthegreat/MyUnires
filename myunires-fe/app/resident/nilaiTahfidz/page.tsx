@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Swal from "sweetalert2";
 import Sidebar_Resident from "@/components/Sidebar_Resident";
 import { FiMenu } from "react-icons/fi";
+import { apiGet } from "@/lib/api";
 
 interface NilaiTahfidz {
   id: number;
@@ -31,33 +32,26 @@ export default function NilaiTahfidzPage() {
   const [nilaiList, setNilaiList] = useState<NilaiTahfidz[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchNilaiTahfidz = async () => {
+    setLoading(true);
+    try {
+      const res = await apiGet<any>("/api/resident/tahfidz/nilai");
+
+      if (res?.success) setNilaiList(res.data);
+      else throw new Error(res?.message || "Gagal memuat data");
+    } catch (error: any) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error.message || "Gagal memuat data nilai tahfidz",
+        confirmButtonColor: "#ef4444",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchNilaiTahfidz = async () => {
-      setLoading(true);
-      try {
-        const token = localStorage.getItem("token");
-        const response = await fetch(
-          "http://localhost:3001/api/resident/tahfidz/nilai",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-
-        const data = await response.json();
-        if (data.success) setNilaiList(data.data);
-        else throw new Error(data.message || "Gagal memuat data");
-      } catch (error: any) {
-        Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: error.message || "Gagal memuat data nilai tahfidz",
-          confirmButtonColor: "#ef4444",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchNilaiTahfidz();
   }, []);
 

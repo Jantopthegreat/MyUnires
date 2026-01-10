@@ -12,6 +12,8 @@ import {
 } from "react-icons/fi";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+
+import LogoutModal from "@/components/LogoutModal";
 import { apiGet, clearAuth } from "@/lib/api";
 
 type Props = {
@@ -43,6 +45,7 @@ export default function Sidebar_AsistenMusyrif({
 
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // Fetch profile (sesuaikan endpoint kalau beda)
   useEffect(() => {
@@ -50,12 +53,11 @@ export default function Sidebar_AsistenMusyrif({
 
     (async () => {
       try {
-        // contoh endpoint profile asisten (ubah sesuai backend kamu)
         const res = await apiGet<ApiRes<UserData>>("/api/asisten/profile");
         if (!active) return;
         if (res?.success) setUserData(res.data);
       } catch (e) {
-        // kalau endpoint belum ada, biarin aja kosong (gak bikin crash)
+        // no-op
       } finally {
         if (active) setLoading(false);
       }
@@ -112,10 +114,12 @@ export default function Sidebar_AsistenMusyrif({
     setMobileOpen(false);
   };
 
+  // Logout yang benar-benar dijalankan saat confirm di modal
   const handleLogout = () => {
     clearAuth();
+    setShowLogoutModal(false);
     setMobileOpen(false);
-    window.location.href = "/login";
+    router.replace("/login");
   };
 
   const ProfileBlock = ({ compact }: { compact: boolean }) => (
@@ -201,7 +205,7 @@ export default function Sidebar_AsistenMusyrif({
       <div className="rounded-2xl border bg-white overflow-hidden">
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={() => setShowLogoutModal(true)} // buka modal dulu
           className={[
             "w-full flex items-center gap-3 px-3 py-3 transition",
             "text-red-700 hover:bg-red-50",
@@ -298,6 +302,13 @@ export default function Sidebar_AsistenMusyrif({
 
         <BottomActions compact={!isOpen} />
       </aside>
+
+      {/* ===== LOGOUT MODAL ===== */}
+      <LogoutModal
+        open={showLogoutModal}
+        onCancel={() => setShowLogoutModal(false)}
+        onLogout={handleLogout}
+      />
     </>
   );
 }

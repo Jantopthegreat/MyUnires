@@ -5,7 +5,6 @@ import Sidebar from "@/components/sidebar_musyrif";
 import ResidentFilterBar from "@/components/ResidentFilterBar";
 import { useResidentDataMusyrif } from "@/lib/hooks/useResidentDataMusyrif";
 import { showResidentDetail } from "@/lib/residentModal";
-import { handleExcelImport } from "@/lib/excelImport";
 
 export default function ResidentPage() {
   const [isOpen, setIsOpen] = useState(true); // desktop collapse
@@ -23,14 +22,10 @@ export default function ResidentPage() {
     setSelectedUsroh,
     selectedLantai,
     setSelectedLantai,
-    refetchResidents,
+    //refetchResidents,
   } = useResidentDataMusyrif();
 
   const toggleSidebar = () => setIsOpen((prev) => !prev);
-
-  const handleImport = async (file: File) => {
-    await handleExcelImport(file, refetchResidents);
-  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -103,7 +98,6 @@ export default function ResidentPage() {
           onLantaiChange={setSelectedLantai}
           usrohList={usrohList}
           lantaiList={lantaiList}
-          onImport={handleImport}
         />
 
         {/* Table */}

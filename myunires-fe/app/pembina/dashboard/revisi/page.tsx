@@ -4,7 +4,7 @@ import { FaSearch, FaChevronRight } from "react-icons/fa";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Swal from "sweetalert2";
-import { clearAuth } from "@/lib/api";
+import { clearAuth, getToken, apiGet } from "@/lib/api";
 
 interface ResidentWithUsroh {
   id: number;
@@ -71,7 +71,8 @@ export default function RevisiPage() {
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
+      // optional: kalau tetap mau validasi token manual
+      const token = getToken();
       if (!token) {
         Swal.fire({
           icon: "error",
@@ -81,28 +82,18 @@ export default function RevisiPage() {
         return;
       }
 
-      // Fetch residents with usroh
-      const residentsRes = await fetch(
-        "http://localhost:3001/api/musyrif/residents",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      const residentsData = await residentsRes.json();
-
-      // Fetch usroh
-      const usrohRes = await fetch("http://localhost:3001/api/musyrif/usroh", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const usrohData = await usrohRes.json();
+      const [residentsData, usrohData] = await Promise.all([
+        apiGet<any>("/api/musyrif/residents"),
+        apiGet<any>("/api/musyrif/usroh"),
+      ]);
 
       setResidents(residentsData.data || []);
       setUsrohList(usrohData.data || []);
-    } catch (error) {
+    } catch (error: any) {
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: "Gagal memuat data dari server.",
+        text: error?.message || "Gagal memuat data dari server.",
       });
     } finally {
       setLoading(false);
@@ -235,7 +226,9 @@ export default function RevisiPage() {
                       <tr>
                         <th className="py-3 text-left px-4 bg-white">No</th>
                         <th className="py-3 text-left px-4 bg-white">Nama</th>
-                        <th className="py-3 text-left px-4 bg-white">No. Unires</th>
+                        <th className="py-3 text-left px-4 bg-white">
+                          No. Unires
+                        </th>
                         <th className="py-3 text-left px-4 bg-white">Usroh</th>
                         <th className="py-3 text-center px-4 bg-white">Aksi</th>
                       </tr>

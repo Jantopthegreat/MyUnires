@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { FaBook, FaArrowLeft } from "react-icons/fa";
 import { FiMenu } from "react-icons/fi";
 import Sidebar_Resident from "@/components/Sidebar_Resident";
+import { apiGet } from "@/lib/api";
 
 interface KategoriMateri {
   id: number;
@@ -35,54 +36,29 @@ export default function MateriPembelajaranPage() {
 
   // Fetch kategori + materi
   useEffect(() => {
-    const fetchKategori = async () => {
+    const run = async () => {
+      setLoading(true);
       try {
-        const token = localStorage.getItem("token");
-        const response = await fetch(
-          "http://localhost:3001/api/resident/kategori",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
+        const [katRes, materiRes] = await Promise.all([
+          apiGet<any>("/api/resident/kategori"),
+          apiGet<any>("/api/resident/materi"),
+        ]);
 
-        const result = await response.json();
-        const data = result.data || result.kategori || result;
-        setKategoriList(Array.isArray(data) ? data : []);
+        const kategori = katRes?.data || katRes?.kategori || katRes;
+        const materi = materiRes?.data || materiRes?.materi || materiRes;
+
+        setKategoriList(Array.isArray(kategori) ? kategori : []);
+        setMateriList(Array.isArray(materi) ? materi : []);
       } catch (error) {
-        console.error("Error fetching kategori:", error);
+        console.error("Error fetching kategori/materi:", error);
         setKategoriList([]);
-      }
-    };
-
-    const fetchMateri = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const response = await fetch(
-          "http://localhost:3001/api/resident/materi",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        const result = await response.json();
-        const data = result.data || result.materi || result;
-        setMateriList(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error fetching materi:", error);
         setMateriList([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchKategori();
-    fetchMateri();
+    run();
   }, []);
 
   const filteredMateri = useMemo(() => {

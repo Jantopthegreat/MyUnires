@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { apiGet, getToken, clearAuth } from "@/lib/api";
 
 interface UserData {
   id: number;
@@ -10,8 +11,8 @@ interface UserData {
 }
 
 type ScheduleItem = {
-  start: string; // "04:00"
-  end: string; // "04:30"
+  start: string;
+  end: string;
   activity: string;
 };
 
@@ -102,28 +103,28 @@ export default function DashboardResidentPage() {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const token = localStorage.getItem("token");
+        // optional: cek token dulu biar cepat redirect
+        const token = getToken();
         if (!token) {
+          // router.push("/login");
           window.location.href = "/login";
           return;
         }
 
-        const response = await fetch(
-          "http://localhost:3001/api/resident/profile",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const data = await apiGet<any>("/api/resident/profile");
 
-        const data = await response.json();
-        if (data?.success) setUserData(data.data);
-        else {
-          localStorage.removeItem("token");
+        // ikutin pola responmu: { success: boolean, data: ... }
+        if (data?.success) {
+          setUserData(data.data);
+        } else {
+          clearAuth(); // hapus token (dan user kalau kamu simpan)
+          // router.push("/login");
           window.location.href = "/login";
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
-        localStorage.removeItem("token");
+        clearAuth();
+        // router.push("/login");
         window.location.href = "/login";
       } finally {
         setLoading(false);

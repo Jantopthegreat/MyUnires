@@ -10,6 +10,7 @@ import {
   FaClipboardCheck,
 } from "react-icons/fa";
 import { FiMenu } from "react-icons/fi";
+import { apiGet } from "@/lib/api";
 
 interface LeaderboardData {
   id: number;
@@ -41,22 +42,9 @@ export default function LeaderboardPage() {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const response = await fetch(
-          "http://localhost:3001/api/resident/leaderboard",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        const result = await response.json();
-        const data = result.data || result.leaderboard || result;
-        const arr = Array.isArray(data) ? data : [];
-
-        setLeaderboardData(arr);
+        const result = await apiGet<any>("/api/resident/leaderboard");
+        const data = result?.data || result?.leaderboard || result;
+        setLeaderboardData(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Error fetching leaderboard:", error);
         setLeaderboardData([]);

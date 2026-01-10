@@ -6,20 +6,20 @@ import {
   FiHome,
   FiUsers,
   FiAward,
-  FiBarChart2,
-  FiBookOpen,
   FiEdit3,
   FiLogOut,
 } from "react-icons/fi";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+
+import LogoutModal from "@/components/LogoutModal";
 import { clearAuth } from "@/lib/api";
 
 type Props = {
   isOpen: boolean;
   toggleSidebar: () => void;
-  mobileOpen: boolean; // <- wajib
-  setMobileOpen: (v: boolean) => void; // <- wajib
+  mobileOpen: boolean;
+  setMobileOpen: (v: boolean) => void;
 };
 
 type UserData = {
@@ -39,6 +39,7 @@ export default function Sidebar({
 
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // Fetch profile musyrif (pastikan backend ada GET /api/musyrif/profile)
   useEffect(() => {
@@ -104,10 +105,12 @@ export default function Sidebar({
     setMobileOpen(false);
   };
 
+  // Logout yang benar-benar jalan saat user confirm di modal
   const handleLogout = () => {
-    clearAuth(); // hapus token dll (punyamu)
+    clearAuth();
+    setShowLogoutModal(false);
     setMobileOpen(false);
-    window.location.href = "/login";
+    router.replace("/login");
   };
 
   const ProfileBlock = ({ compact }: { compact: boolean }) => (
@@ -160,8 +163,8 @@ export default function Sidebar({
           // biar nested route ikut ke-highlight
           const active =
             pathname === item.href ||
-            (item.href !== "/dashboard/musyrif" &&
-              pathname?.startsWith(item.href)); // startsWith pattern umum [web:1953]
+            (item.href !== "/pembina/dashboard" &&
+              pathname?.startsWith(item.href));
 
           return (
             <li key={item.href}>
@@ -194,7 +197,7 @@ export default function Sidebar({
       <div className="rounded-2xl border bg-white overflow-hidden">
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={() => setShowLogoutModal(true)} // buka modal dulu
           className={[
             "w-full flex items-center gap-3 px-3 py-3 transition",
             "text-red-700 hover:bg-red-50",
@@ -291,6 +294,13 @@ export default function Sidebar({
 
         <BottomActions compact={!isOpen} />
       </aside>
+
+      {/* ===== LOGOUT MODAL ===== */}
+      <LogoutModal
+        open={showLogoutModal}
+        onCancel={() => setShowLogoutModal(false)}
+        onLogout={handleLogout}
+      />
     </>
   );
 }

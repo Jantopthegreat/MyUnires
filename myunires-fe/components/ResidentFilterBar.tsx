@@ -21,7 +21,7 @@ interface ResidentFilterBarProps {
   onLantaiChange: (value: string) => void;
   usrohList: Usroh[];
   lantaiList: Lantai[];
-  onImport: (file: File) => void;
+  onImport?: (file: File) => void; // <-- jadi opsional
 }
 
 export default function ResidentFilterBar({
@@ -43,19 +43,15 @@ export default function ResidentFilterBar({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (file && onImport) {
       onImport(file);
-      // Reset input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
   return (
     <section className="flex flex-wrap items-center justify-between px-6 mb-5">
       <div className="flex flex-wrap items-center gap-3">
-        {/* Search box */}
         <div className="flex items-center border border-gray-300 rounded-xl px-3 py-2 shadow-sm bg-white">
           <FaSearch className="text-gray-400 mr-2" />
           <input
@@ -67,7 +63,6 @@ export default function ResidentFilterBar({
           />
         </div>
 
-        {/* Usroh Filter */}
         <select
           value={selectedUsroh}
           onChange={(e) => onUsrohChange(e.target.value)}
@@ -81,7 +76,6 @@ export default function ResidentFilterBar({
           ))}
         </select>
 
-        {/* Asrama/Lantai Filter */}
         <select
           value={selectedLantai}
           onChange={(e) => onLantaiChange(e.target.value)}
@@ -96,23 +90,26 @@ export default function ResidentFilterBar({
         </select>
       </div>
 
-      {/* Tombol Impor Data */}
-      <div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".xlsx,.xls"
-          onChange={handleFileChange}
-          className="hidden"
-        />
-        <button
-          onClick={handleImportClick}
-          className="flex items-center border border-gray-300 rounded-xl px-4 py-2 text-sm text-gray-400 hover:bg-gray-100 shadow-sm transition"
-        >
-          <img src="/import_data.svg" alt="Import" className="h-4 w-4 mr-2" />
-          Impor Data
-        </button>
-      </div>
+      {/* Import hanya muncul kalau onImport dikirim */}
+      {onImport && (
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={handleImportClick}
+            className="flex items-center border border-gray-300 rounded-xl px-4 py-2 text-sm text-gray-400 hover:bg-gray-100 shadow-sm transition"
+          >
+            <img src="/import_data.svg" alt="Import" className="h-4 w-4 mr-2" />
+            Impor Data
+          </button>
+        </div>
+      )}
     </section>
   );
 }

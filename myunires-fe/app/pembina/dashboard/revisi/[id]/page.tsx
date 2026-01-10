@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { apiGet, getToken, apiPost } from "@/lib/api";
 import RevisiHeader from "@/components/RevisiHeader";
 import RevisiResidentInfo from "@/components/RevisiResidentInfo";
 import RevisiAddButton from "@/components/RevisiAddButton";
@@ -65,24 +66,23 @@ export default function RevisiDetailPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
+      // Optional: validasi token sebelum request (apiGet juga bakal jalanin header token)
+      const token = getToken();
       if (!token) {
         Swal.fire({
           icon: "error",
           title: "Error",
           text: "Token tidak ditemukan. Silakan login kembali.",
         });
+
         return;
       }
 
-      // Fetch nilai tahfidz detail untuk resident ini
-      const nilaiRes = await fetch(
-        "http://localhost:3001/api/musyrif/tahfidz/detail",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      const nilaiData = await nilaiRes.json();
+      // ambil dua data sekaligus biar cepat
+      const [nilaiData, targetData] = await Promise.all([
+        apiGet<any>("/api/musyrif/tahfidz/detail"),
+        apiGet<any>("/api/musyrif/target-hafalan"),
+      ]);
 
       // Filter nilai untuk resident ini saja
       const residentNilai = (nilaiData.data || []).filter(
@@ -94,22 +94,19 @@ export default function RevisiDetailPage() {
         setResidentName(residentNilai[0].resident);
       }
 
-      // Fetch target hafalan
-      const targetRes = await fetch(
-        "http://localhost:3001/api/musyrif/target-hafalan",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      const targetData = await targetRes.json();
-
       console.log("🔍 Debug - Resident Nilai:", residentNilai);
       console.log("🔍 Debug - Target Hafalan:", targetData);
 
       setNilaiList(residentNilai);
       setTargetHafalan(targetData.data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching data:", error);
+
+      // Optional: kalau error karena unauthorized, paksa logout
+      // if (String(error?.message || "").includes("401")) {
+      //   clearAuth();
+      // }
+
       Swal.fire({
         icon: "error",
         title: "Error",
@@ -134,7 +131,8 @@ export default function RevisiDetailPage() {
 
   const handleSave = async (formData: any) => {
     try {
-      const token = localStorage.getItem("token");
+      // optional: kalau tetap mau validasi token manual
+      const token = getToken();
       if (!token) {
         Swal.fire({
           icon: "error",
@@ -144,50 +142,29 @@ export default function RevisiDetailPage() {
         return;
       }
 
-      // Force resident ID untuk form ini
       const dataToSave = {
         ...formData,
         residentId: Number(residentId),
       };
 
-      const response = await fetch(
-        "http://localhost:3001/api/musyrif/tahfidz",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(dataToSave),
-        }
-      );
+      const result = await apiPost<any>("/api/musyrif/tahfidz", dataToSave);
 
-      const result = await response.json();
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil!",
+        text: result?.message || "Data berhasil disimpan.",
+        confirmButtonColor: "#22c55e",
+        timer: 2000,
+      });
 
-      if (response.ok) {
-        Swal.fire({
-          icon: "success",
-          title: "Berhasil!",
-          text: result.message || "Data berhasil disimpan.",
-          confirmButtonColor: "#22c55e",
-          timer: 2000,
-        });
-
-        setShowModal(false);
-        fetchData(); // Refresh data
-      } else {
-        Swal.fire({
-          icon: "error",
-          title: "Gagal",
-          text: result.message || "Terjadi kesalahan saat menyimpan data.",
-        });
-      }
-    } catch (error) {
+      setShowModal(false);
+      fetchData();
+    } catch (error: any) {
       console.error("Error saving data:", error);
       Swal.fire({
         icon: "error",
-        title: "Error",
-        text: "Gagal menyimpan data ke server.",
+        title: "Gagal",
+        text: error?.message || "Gagal menyimpan data ke server.",
       });
     }
   };

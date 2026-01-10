@@ -51,6 +51,7 @@ function StatCard({
 }
 
 export default function DashboardMusyrifPage() {
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -58,13 +59,6 @@ export default function DashboardMusyrifPage() {
   const [residents, setResidents] = useState<ResidentItem[]>([]);
   const [nilaiDetail, setNilaiDetail] = useState<NilaiTahfidzDetailRow[]>([]);
   const [loading, setLoading] = useState(true);
-  // Fungsi handleLogout
-  const handleLogout = () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("token");
-    }
-    window.location.href = "/login";
-  };
 
   useEffect(() => {
     let active = true;
@@ -100,7 +94,7 @@ export default function DashboardMusyrifPage() {
 
   const handleLogout = () => {
     clearAuth();
-    router.push("/login");
+    router.replace("/login");
   };
 
   const stats = useMemo(() => {
@@ -180,14 +174,6 @@ export default function DashboardMusyrifPage() {
             className="h-7 sm:h-8 w-auto object-contain shrink-0"
           />
         </div>
-
-        {/* Tombol Logout */}
-        <button
-          className="bg-[#E50914] hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-full shadow-md"
-          onClick={() => setShowLogoutModal(true)}
-        >
-          Log Out
-        </button>
       </header>
 
       <Sidebar_Musyrif
